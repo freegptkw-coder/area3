@@ -3,6 +3,7 @@ package com.aria.assistant.live.core
 import android.content.Context
 import com.aria.assistant.VoiceCommandParser
 import com.aria.assistant.automation.ParsedAutomationCommand
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -119,6 +120,10 @@ class LiveDialogOrchestrator(
                     handleAssistantReplyText(chunk)
                 }
             }.onFailure {
+                if (it is CancellationException) {
+                    onAudit("live_orchestrator:provider_cancelled:${it.javaClass.simpleName}")
+                    return@onFailure
+                }
                 emitEvent(VoiceSessionEvent.BackendFailure("provider_stream_failed:${it.javaClass.simpleName}"))
                 val fallbackText = "দুঃখিত, এই মুহূর্তে live response আসছে না। আবার বলুন।"
                 onOverlayMessage(fallbackText)

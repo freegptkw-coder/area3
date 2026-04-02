@@ -8,7 +8,8 @@ data class BargeInDecision(
 class BargeInController(
     private val enabledProvider: () -> Boolean = { true },
     private val minInterruptIntervalMs: Long = 500L,
-    private val assistantOutputHoldMs: Long = 1800L
+    private val assistantOutputHoldMs: Long = 1800L,
+    private val staleSpeakingToleranceMs: Long = 1200L
 ) {
 
     @Volatile
@@ -33,7 +34,9 @@ class BargeInController(
             return BargeInDecision(false, "disabled")
         }
 
-        val assistantLikelyActive = currentState.isSpeechOutputState() || nowMs <= assistantOutputActiveUntilMs
+        val assistantLikelyActive =
+            nowMs <= assistantOutputActiveUntilMs ||
+                (currentState.isSpeechOutputState() && (nowMs - assistantOutputActiveUntilMs) <= staleSpeakingToleranceMs)
         if (!assistantLikelyActive) {
             return BargeInDecision(false, "assistant_not_speaking")
         }

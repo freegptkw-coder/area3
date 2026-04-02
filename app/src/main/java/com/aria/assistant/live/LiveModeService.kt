@@ -18,6 +18,7 @@ import com.aria.assistant.live.core.SttHealthTracker
 import com.aria.assistant.live.core.SttTranscriptEvent
 import com.aria.assistant.live.core.StreamingSttGateway
 import com.aria.assistant.live.core.VoiceSessionEvent
+import com.aria.assistant.live.core.VoiceSessionState
 import com.aria.assistant.live.core.VoiceTurnStateMachine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -110,6 +111,13 @@ class LiveModeService : Service() {
     private var sttLastRetryDelayMs: Long = 0L
     @Volatile
     private var sttLastSuccessAtMs: Long = 0L
+    private var transientFocusLossInterruptJob: Job? = null
+
+    @Volatile
+    private var lastTransientFocusLossAtMs: Long = 0L
+
+    private val audioFocusTransientGraceMs: Long = 650L
+    private val audioFocusInterruptWindowMs: Long = 2200L
 
     override fun onCreate() {
         super.onCreate()
@@ -125,6 +133,7 @@ class LiveModeService : Service() {
         audioFocusArbiter = AudioFocusArbiter(this) { state, rawChange ->
             when (state) {
                 AudioFocusArbiter.AudioFocusState.GAINED -> {
+                    cancelPendingTransientFocusLossInterrupt("gained")
                     suppressAssistantAudioByFocus = false
                     duckAssistantAudioByFocus = false
                     AuditLogger.log(this, "audio_focus:gained:$rawChange")
@@ -134,12 +143,14 @@ class LiveModeService : Service() {
                 AudioFocusArbiter.AudioFocusState.LOSS_TRANSIENT -> {
                     suppressAssistantAudioByFocus = true
                     duckAssistantAudioByFocus = false
+                    lastTransientFocusLossAtMs = System.currentTimeMillis()
                     AuditLogger.log(this, "audio_focus:loss_transient:$rawChange")
                     voiceStateMachine.onEvent(VoiceSessionEvent.RecoverableWarning("audio_focus_loss_transient"))
-                    if (running) interruptAssistantSpeech("audio_focus_loss_transient")
+                    if (running) scheduleTransientFocusLossInterrupt(rawChange)
                 }
 
                 AudioFocusArbiter.AudioFocusState.LOSS_TRANSIENT_CAN_DUCK -> {
+                    cancelPendingTransientFocusLossInterrupt("duck")
                     suppressAssistantAudioByFocus = false
                     duckAssistantAudioByFocus = true
                     AuditLogger.log(this, "audio_focus:duck:$rawChange")
@@ -147,11 +158,14 @@ class LiveModeService : Service() {
                 }
 
                 AudioFocusArbiter.AudioFocusState.LOSS_PERMANENT -> {
+                    cancelPendingTransientFocusLossInterrupt("loss_permanent")
                     suppressAssistantAudioByFocus = true
                     duckAssistantAudioByFocus = false
                     AuditLogger.log(this, "audio_focus:loss_permanent:$rawChange")
                     voiceStateMachine.onEvent(VoiceSessionEvent.BackendFailure("audio_focus_loss_permanent"))
-                    if (running) interruptAssistantSpeech("audio_focus_loss_permanent")
+                    if (running && shouldInterruptForAudioFocusLoss()) {
+                        interruptAssistantSpeech("audio_focus_loss_permanent")
+                    }
                 }
 
                 AudioFocusArbiter.AudioFocusState.FAILED -> {
@@ -162,6 +176,7 @@ class LiveModeService : Service() {
                 }
 
                 AudioFocusArbiter.AudioFocusState.IDLE -> {
+                    cancelPendingTransientFocusLossInterrupt("idle")
                     suppressAssistantAudioByFocus = false
                     duckAssistantAudioByFocus = false
                     AuditLogger.log(this, "audio_focus:idle:$rawChange")
@@ -242,6 +257,7 @@ class LiveModeService : Service() {
 
     override fun onDestroy() {
         running = false
+        cancelPendingTransientFocusLossInterrupt("service_destroy")
         if (this::voiceStateMachine.isInitialized) {
             voiceStateMachine.onEvent(VoiceSessionEvent.SessionStopped)
         }
@@ -761,6 +777,8 @@ class LiveModeService : Service() {
             sttAvailabilityStatus = "retry_trigger"
             publishSttDebugStatus(retryActiveOverride = false)
             AuditLogger.log(this@LiveModeService, "stt_retry:trigger:$reason")
+            runCatching { sttGateway?.stop() }
+            delay(120L)
             runCatching { sttGateway?.start() }
                 .onFailure {
                     AuditLogger.log(this@LiveModeService, "stt_retry:start_failed:${it.javaClass.simpleName}")
@@ -882,6 +900,7 @@ class LiveModeService : Service() {
                 avatarOverlay?.setSpeaking(true)
                 voiceStateMachine.onEvent(VoiceSessionEvent.AssistantAudioStarted(source))
             } else {
+                bargeInController.markAssistantOutputStarted(now)
                 voiceStateMachine.onEvent(VoiceSessionEvent.AssistantAudioChunk(source))
             }
         } else if (assistantAudioActive) {
@@ -894,6 +913,10 @@ class LiveModeService : Service() {
     }
 
     private fun interruptAssistantSpeech(reason: String) {
+        if (reason.startsWith("audio_focus_loss") && !shouldInterruptForAudioFocusLoss()) {
+            AuditLogger.log(this, "barge_in:skip:$reason:no_assistant_output")
+            return
+        }
         AuditLogger.log(this, "barge_in:interrupt:$reason")
         avatarOverlay?.setSpeaking(false)
         avatarOverlay?.updateMessage("Interrupted. Listening...")
@@ -906,6 +929,52 @@ class LiveModeService : Service() {
         bargeInController.markAssistantOutputStopped()
         bargeInController.markInterrupted()
         voiceStateMachine.onEvent(VoiceSessionEvent.UserInterruptedAssistant(reason))
+    }
+
+    private fun scheduleTransientFocusLossInterrupt(rawChange: Int) {
+        cancelPendingTransientFocusLossInterrupt("reschedule")
+        val job = serviceScope.launch {
+            delay(audioFocusTransientGraceMs)
+            if (!running) return@launch
+            if (!audioFocusArbiter.isOutputSuppressed()) {
+                AuditLogger.log(this@LiveModeService, "audio_focus:transient_recovered_before_grace")
+                return@launch
+            }
+            if (!shouldInterruptForAudioFocusLoss()) {
+                AuditLogger.log(this@LiveModeService, "audio_focus:transient_ignore:not_speaking")
+                return@launch
+            }
+            val ageMs = System.currentTimeMillis() - lastTransientFocusLossAtMs
+            AuditLogger.log(this@LiveModeService, "audio_focus:transient_interrupt_after_grace:${ageMs}ms:$rawChange")
+            interruptAssistantSpeech("audio_focus_loss_transient")
+        }
+        transientFocusLossInterruptJob = job
+        job.invokeOnCompletion {
+            if (transientFocusLossInterruptJob == job) {
+                transientFocusLossInterruptJob = null
+            }
+        }
+    }
+
+    private fun cancelPendingTransientFocusLossInterrupt(reason: String) {
+        val existing = transientFocusLossInterruptJob
+        if (existing?.isActive == true) {
+            existing.cancel()
+            AuditLogger.log(this, "audio_focus:transient_cancel:$reason")
+        }
+        transientFocusLossInterruptJob = null
+    }
+
+    private fun shouldInterruptForAudioFocusLoss(nowMs: Long = System.currentTimeMillis()): Boolean {
+        val state = if (this::voiceStateMachine.isInitialized) {
+            voiceStateMachine.currentState
+        } else {
+            VoiceSessionState.IDLE
+        }
+        val arbiterSpeaking = speechOutputArbiter?.isSpeaking() == true
+        val recentAssistantOutput = assistantOutputTickAt > 0L &&
+            (nowMs - assistantOutputTickAt) <= audioFocusInterruptWindowMs
+        return assistantAudioActive || arbiterSpeaking || state == VoiceSessionState.SPEAKING || recentAssistantOutput
     }
 
     private fun extractSpeakableText(raw: String): String? {

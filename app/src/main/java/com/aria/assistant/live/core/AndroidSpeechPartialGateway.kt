@@ -25,12 +25,20 @@ class AndroidSpeechPartialGateway(
     @Volatile
     private var listening: Boolean = false
 
+    @Volatile
+    private var restartScheduled: Boolean = false
+
     private var recognizer: SpeechRecognizer? = null
     private var consecutiveErrors: Int = 0
     private var lastPartialText: String = ""
+    private var lastStartAttemptAtMs: Long = 0L
+
+    private val minRestartGapMs: Long = 750L
+    private val maxConsecutiveErrorsBeforeUnavailable: Int = 6
 
     private val restartRunnable = Runnable {
         if (!running) return@Runnable
+        restartScheduled = false
         startListeningInternal()
     }
 
@@ -59,6 +67,7 @@ class AndroidSpeechPartialGateway(
         running = false
         mainHandler.post {
             mainHandler.removeCallbacks(restartRunnable)
+            restartScheduled = false
             listening = false
             runCatching { recognizer?.stopListening() }
             runCatching { recognizer?.cancel() }
@@ -70,9 +79,9 @@ class AndroidSpeechPartialGateway(
 
     override fun onVoiceActivity(active: Boolean) {
         if (!active || !running) return
-        if (!listening) {
+        if (!listening && !restartScheduled) {
             mainHandler.post {
-                if (running && !listening) {
+                if (running && !listening && !restartScheduled) {
                     startListeningInternal()
                 }
             }
@@ -90,6 +99,15 @@ class AndroidSpeechPartialGateway(
     private fun startListeningInternal() {
         val sr = recognizer ?: return
         if (!running) return
+        if (listening) return
+
+        val now = System.currentTimeMillis()
+        val sinceLastAttempt = now - lastStartAttemptAtMs
+        if (lastStartAttemptAtMs > 0L && sinceLastAttempt in 0 until minRestartGapMs) {
+            scheduleRestart(minRestartGapMs - sinceLastAttempt)
+            return
+        }
+        lastStartAttemptAtMs = now
 
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -102,6 +120,7 @@ class AndroidSpeechPartialGateway(
         }
 
         mainHandler.removeCallbacks(restartRunnable)
+        restartScheduled = false
         runCatching {
             sr.startListening(intent)
             listening = true
@@ -115,14 +134,15 @@ class AndroidSpeechPartialGateway(
                     recoverable = true
                 )
             )
-            scheduleRestart(500L)
+            scheduleRestart(1200L)
         }
     }
 
     private fun scheduleRestart(delayMs: Long) {
         if (!running) return
         mainHandler.removeCallbacks(restartRunnable)
-        mainHandler.postDelayed(restartRunnable, delayMs)
+        restartScheduled = true
+        mainHandler.postDelayed(restartRunnable, delayMs.coerceAtLeast(minRestartGapMs))
     }
 
     private fun handleError(code: Int) {
@@ -169,9 +189,10 @@ class AndroidSpeechPartialGateway(
             )
         )
 
-        if (!recoverable || consecutiveErrors >= 4) {
+        if (!recoverable || consecutiveErrors >= maxConsecutiveErrorsBeforeUnavailable) {
             running = false
             mainHandler.removeCallbacks(restartRunnable)
+            restartScheduled = false
             if (!recoverable) {
                 onEvent(SttTranscriptEvent.Unavailable)
             } else {
@@ -187,14 +208,19 @@ class AndroidSpeechPartialGateway(
             return
         }
 
-        scheduleRestart(280L)
+        val retryDelay = when (code) {
+            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> 1800L + (consecutiveErrors * 350L)
+            SpeechRecognizer.ERROR_NO_MATCH -> 1200L + (consecutiveErrors * 250L)
+            else -> 900L + (consecutiveErrors * 300L)
+        }
+        scheduleRestart(retryDelay.coerceAtMost(6000L))
     }
 
     private fun onResultsOrFinalized() {
         listening = false
         consecutiveErrors = 0
         lastPartialText = ""
-        scheduleRestart(180L)
+        scheduleRestart(700L)
     }
 
     private val listener = object : RecognitionListener {
