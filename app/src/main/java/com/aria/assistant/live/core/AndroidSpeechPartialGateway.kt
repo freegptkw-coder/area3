@@ -63,29 +63,6 @@ class AndroidSpeechPartialGateway(
             onEvent(SttTranscriptEvent.ListeningStopped)
         }
     }
-            if (recognizer == null) {
-                recognizer = createRecognizerOrNull()
-            }
-            if (recognizer == null) {
-                running = false
-                onEvent(SttTranscriptEvent.Unavailable)
-                return@post
-            }
-            // We wait for onVoiceActivity(true) from the VAD engine to avoid 5s timeout beeps.
-            onEvent(SttTranscriptEvent.ListeningStopped)
-        }
-    }
-            if (recognizer == null) {
-                recognizer = createRecognizerOrNull()
-            }
-            if (recognizer == null) {
-                running = false
-                onEvent(SttTranscriptEvent.Unavailable)
-                return@post
-            }
-            startListeningInternal()
-        }
-    }
 
     override fun stop() {
         running = false

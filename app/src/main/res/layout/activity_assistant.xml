@@ -57,23 +57,17 @@
         app:layout_constraintEnd_toEndOf="parent" />
 
 
-    <!-- Chat ScrollView -->
-    <ScrollView
-        android:id="@+id/chatScrollView"
+    <!-- Chat RecyclerView -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/chatRecyclerView"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:padding="16dp"
+        android:clipToPadding="false"
         app:layout_constraintTop_toBottomOf="@id/voiceStatusText"
         app:layout_constraintBottom_toTopOf="@id/inputLayout"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <LinearLayout
-            android:id="@+id/chatContainer"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical" />
-    </ScrollView>
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <!-- Input Layout -->
     <LinearLayout

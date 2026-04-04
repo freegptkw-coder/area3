@@ -31,7 +31,12 @@ class TaskStatusAdapter(
     }
 
     override fun onBindViewHolder(holder: TaskViewHolder, position: Int) {
-        holder.bind(items[position])
+        val task = items[position]
+        holder.bind(task)
+        
+        // Simple fade-in animation for new items
+        holder.itemView.alpha = 0f
+        holder.itemView.animate().alpha(1f).setDuration(300).start()
     }
 
     override fun getItemCount(): Int = items.size
@@ -49,7 +54,13 @@ class TaskStatusAdapter(
             title.text = task.title
             subtitle.text = task.description
             status.text = "${task.type} • ${task.priority.name.lowercase()} • ${task.status.name.lowercase()}"
-            progress.progress = task.progressPercent
+            
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                progress.setProgress(task.progressPercent, true)
+            } else {
+                progress.progress = task.progressPercent
+            }
+            
             progressText.text = "${task.progressPercent}%"
 
             val runningLike = task.status == TaskStatus.RUNNING || task.status == TaskStatus.QUEUED

@@ -13,15 +13,14 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
-import android.view.Gravity
 import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.aria.assistant.automation.AutomationAuditLogger
 import com.aria.assistant.automation.ParsedAutomationCommand
 import com.aria.assistant.automation.SafeIntentEnvelope
@@ -42,8 +41,8 @@ import java.util.*
 
 class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     
-    private lateinit var chatContainer: LinearLayout
-    private lateinit var chatScrollView: ScrollView
+    private lateinit var chatRecyclerView: RecyclerView
+    private lateinit var chatAdapter: ChatAdapter
     private lateinit var messageInput: EditText
     private lateinit var voiceButton: MaterialButton
     private lateinit var stopSpeakButton: MaterialButton
@@ -85,8 +84,13 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         AppHealthMonitor.markAppStart(this)
         
         // Initialize views
-        chatContainer = findViewById(R.id.chatContainer)
-        chatScrollView = findViewById(R.id.chatScrollView)
+        chatRecyclerView = findViewById(R.id.chatRecyclerView)
+        chatAdapter = ChatAdapter()
+        chatRecyclerView.layoutManager = LinearLayoutManager(this).apply {
+            stackFromEnd = false
+        }
+        chatRecyclerView.adapter = chatAdapter
+        
         messageInput = findViewById(R.id.messageInput)
         voiceButton = findViewById(R.id.voiceButton)
         stopSpeakButton = findViewById(R.id.stopSpeakButton)
@@ -401,8 +405,8 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             updateProgress(70, "Response received")
 
             withContext(Dispatchers.Main) {
-                if (chatContainer.childCount > 0) {
-                    chatContainer.removeViewAt(chatContainer.childCount - 1)
+                if (chatAdapter.getItemCountCurrent() > 0) {
+                    chatAdapter.removeLastMessage()
                 }
 
                 val parsedAssistant = VoiceCommandParser.parseAssistantJson(response.text)
@@ -482,64 +486,23 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
     
     private fun addUserMessage(text: String) {
-        val textView = TextView(this).apply {
-            this.text = text
-            textSize = 16f
-            setTextColor(ContextCompat.getColor(context, R.color.white))
-            setBackgroundColor(ContextCompat.getColor(context, R.color.message_user))
-            setPadding(24, 16, 24, 16)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.END
-                setMargins(100, 8, 8, 8)
-            }
-        }
-        chatContainer.addView(textView)
+        chatAdapter.addMessage(ChatMessage(text = text, sender = ChatMessage.SenderType.USER))
         scrollToBottom()
     }
     
     private fun addAssistantMessage(text: String) {
-        val textView = TextView(this).apply {
-            this.text = text
-            textSize = 16f
-            setTextColor(ContextCompat.getColor(context, R.color.white))
-            setBackgroundColor(ContextCompat.getColor(context, R.color.message_assistant))
-            setPadding(24, 16, 24, 16)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.START
-                setMargins(8, 8, 100, 8)
-            }
-        }
-        chatContainer.addView(textView)
+        chatAdapter.addMessage(ChatMessage(text = text, sender = ChatMessage.SenderType.ASSISTANT))
         scrollToBottom()
     }
     
     private fun addSystemMessage(text: String) {
-        val textView = TextView(this).apply {
-            this.text = text
-            textSize = 12f
-            setTextColor(ContextCompat.getColor(context, android.R.color.darker_gray))
-            gravity = Gravity.CENTER
-            setPadding(16, 8, 16, 8)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(8, 4, 8, 4)
-            }
-        }
-        chatContainer.addView(textView)
+        chatAdapter.addMessage(ChatMessage(text = text, sender = ChatMessage.SenderType.SYSTEM))
         scrollToBottom()
     }
     
     private fun scrollToBottom() {
-        chatScrollView.post {
-            chatScrollView.fullScroll(ScrollView.FOCUS_DOWN)
+        if (chatAdapter.getItemCountCurrent() > 0) {
+            chatRecyclerView.smoothScrollToPosition(chatAdapter.getItemCountCurrent() - 1)
         }
     }
     
