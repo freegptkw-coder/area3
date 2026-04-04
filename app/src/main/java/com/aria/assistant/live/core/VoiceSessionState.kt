@@ -17,3 +17,17 @@ enum class VoiceSessionState {
 fun VoiceSessionState.isSpeechOutputState(): Boolean {
     return this == VoiceSessionState.SPEAKING
 }
+
+/**
+ * Update #6: isSpeakingState() for BargeInController compatibility
+ */
+fun VoiceSessionState.isSpeakingState(): Boolean {
+    return this == VoiceSessionState.SPEAKING ||
+           this == VoiceSessionState.EXECUTING_ACTION
+}
+
+fun VoiceSessionState.isInteractiveState(): Boolean {
+    return this == VoiceSessionState.IDLE ||
+           this == VoiceSessionState.LISTENING ||
+           this == VoiceSessionState.PARTIAL_TRANSCRIPTION
+}

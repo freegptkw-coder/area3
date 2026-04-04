@@ -37,6 +37,13 @@
     <!-- Root permissions (device must be rooted) -->
     <uses-permission android:name="android.permission.ACCESS_SUPERUSER" />
 
+    <!-- v3.0 New permissions -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
+
     <queries>
         <package android:name="com.whatsapp" />
         <package android:name="com.google.android.youtube" />

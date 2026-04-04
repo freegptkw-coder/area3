@@ -10,7 +10,8 @@ import com.aria.assistant.R
 enum class ThemeMode {
     SYSTEM,
     LIGHT,
-    DARK
+    DARK,
+    AUTO // Update #14: auto-switch dark/light based on time
 }
 
 enum class ThemePalette {
@@ -61,6 +62,15 @@ object ThemeManager {
             ThemeMode.SYSTEM -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
             ThemeMode.LIGHT -> AppCompatDelegate.MODE_NIGHT_NO
             ThemeMode.DARK -> AppCompatDelegate.MODE_NIGHT_YES
+            ThemeMode.AUTO -> {
+                // Auto-switch: dark 7PM-7AM, light 7AM-7PM
+                val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+                if (hour >= 19 || hour < 7) {
+                    AppCompatDelegate.MODE_NIGHT_YES
+                } else {
+                    AppCompatDelegate.MODE_NIGHT_NO
+                }
+            }
         }
         AppCompatDelegate.setDefaultNightMode(appMode)
     }
@@ -76,13 +86,15 @@ object ThemeManager {
     fun modeLabels(): Array<String> = arrayOf(
         "System",
         "Light",
-        "Dark"
+        "Dark",
+        "Auto (7PM-7AM)"
     )
 
     fun modeValues(): Array<ThemeMode> = arrayOf(
         ThemeMode.SYSTEM,
         ThemeMode.LIGHT,
-        ThemeMode.DARK
+        ThemeMode.DARK,
+        ThemeMode.AUTO
     )
 
     fun paletteValues(): Array<ThemePalette> = arrayOf(
