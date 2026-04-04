@@ -73,9 +73,19 @@ class LocationReminderManager(
 
     /** Remove all reminders */
     fun removeAllReminders() {
-        geofencingClient.removeGeofences(context.createGeofencePendingIntent())?.addOnSuccessListener {
+        geofencingClient.removeGeofences(createGeofencePendingIntent())?.addOnSuccessListener {
             Log.i(TAG, "All geofences removed")
         }
+    }
+
+    private fun createGeofencePendingIntent(): PendingIntent {
+        val intent = Intent(context, GeofenceBroadcastReceiver::class.java)
+        return PendingIntent.getBroadcast(
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
     }
 }
 

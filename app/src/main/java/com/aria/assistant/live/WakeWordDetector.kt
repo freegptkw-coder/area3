@@ -17,9 +17,11 @@ class WakeWordDetector(
     companion object {
         private const val TAG = "WakeWordDetector"
         private const val SAMPLE_RATE = 16000
-        private const val BUFFER_SIZE = AudioRecord.getMinBufferSize(
-            SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
-        ) * 2
+        private val BUFFER_SIZE: Int = runCatching {
+            AudioRecord.getMinBufferSize(
+                SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
+            ) * 2
+        }.getOrElse { 4096 } // fallback if unavailable
         private const val ENERGY_THRESHOLD = 500.0 // RMS energy threshold
         private const val SILENCE_WINDOW_MS = 300
     }

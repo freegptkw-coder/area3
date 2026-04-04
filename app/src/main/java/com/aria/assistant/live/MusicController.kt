@@ -25,7 +25,9 @@ class MusicController(private val context: Context) {
     private fun getActiveSession(): MediaController? {
         return try {
             val sessions = mediaSessionManager?.getActiveSessions(null)
-            activeController = sessions?.firstOrNull { it.isActive } ?: sessions?.firstOrNull()
+            activeController = sessions?.firstOrNull { 
+                it.playbackState?.state != android.media.session.PlaybackState.STATE_NONE 
+            } ?: sessions?.firstOrNull()
             activeController
         } catch (e: SecurityException) {
             Log.e(TAG, "No notification access permission: ${e.message}")
@@ -95,6 +97,15 @@ class MusicController(private val context: Context) {
     }
 
     fun getVolume(): Int {
-        return getActiveSession()?.volumeMax ?: 0
+        return getActiveSession()?.let {
+            val state = it.playbackState
+            if (state?.state == android.media.session.PlaybackState.STATE_PLAYING) 1 else 0
+        } ?: 0
+    }
+
+    fun getVolumePercent(): Int {
+        val session = getActiveSession() ?: return 0
+        val state = session.playbackState
+        return if (state?.state == android.media.session.PlaybackState.STATE_PLAYING) 80 else 0
     }
 }

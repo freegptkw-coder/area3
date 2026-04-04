@@ -140,6 +140,10 @@ object ThemeManager {
         return when (load(context).mode) {
             ThemeMode.DARK -> true
             ThemeMode.LIGHT -> false
+            ThemeMode.AUTO -> {
+                val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+                hour >= 19 || hour < 7
+            }
             ThemeMode.SYSTEM -> {
                 val nightModeFlags = context.resources.configuration.uiMode and
                     android.content.res.Configuration.UI_MODE_NIGHT_MASK

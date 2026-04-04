@@ -7,7 +7,6 @@ import android.graphics.Path
 import android.util.AttributeSet
 import android.util.Log
 import android.view.View
-import com.aria.assistant.live.core.VoiceSessionEvent
 import com.aria.assistant.live.core.VoiceSessionState
 
 /**
@@ -25,7 +24,7 @@ class AudioWaveformView @JvmOverloads constructor(
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val amplitudes = FloatArray(BAR_COUNT) { 0.2f }
-    private var currentState: VoiceSessionState = VoiceSessionState.Idle
+    private var currentState: VoiceSessionState = VoiceSessionState.IDLE
 
     init {
         paint.style = Paint.Style.FILL
@@ -42,10 +41,10 @@ class AudioWaveformView @JvmOverloads constructor(
     fun updateState(state: VoiceSessionState) {
         currentState = state
         paint.color = when (state) {
-            VoiceSessionState.Idle -> android.graphics.Color.rgb(0x60, 0x80, 0xFF)
-            is VoiceSessionState.Listening -> android.graphics.Color.rgb(0x40, 0xFF, 0x80)
-            VoiceSessionState.Speaking -> android.graphics.Color.rgb(0xFF, 0x60, 0x40)
-            is VoiceSessionState.Processing -> android.graphics.Color.rgb(0xFF, 0xFF, 0x40)
+            VoiceSessionState.IDLE -> android.graphics.Color.rgb(0x60, 0x80, 0xFF)
+            VoiceSessionState.LISTENING -> android.graphics.Color.rgb(0x40, 0xFF, 0x80)
+            VoiceSessionState.SPEAKING -> android.graphics.Color.rgb(0xFF, 0x60, 0x40)
+            VoiceSessionState.THINKING -> android.graphics.Color.rgb(0xFF, 0xFF, 0x40)
             else -> android.graphics.Color.GRAY
         }
         invalidate()

@@ -26,7 +26,7 @@ class VoiceOrbAnimator(
     }
     private var currentAnimator: ValueAnimator? = null
     private var currentAlpha = 0.5f
-    private var currentState = VoiceSessionState.Idle
+    private var currentState = VoiceSessionState.IDLE
 
     fun updateState(newState: VoiceSessionState) {
         if (newState == currentState) return
@@ -39,17 +39,17 @@ class VoiceOrbAnimator(
         currentAnimator = null
 
         val (startAlpha, endAlpha, duration) = when (state) {
-            VoiceSessionState.Idle -> Triple(0.3f, 0.7f, ANIM_DURATION_IDLE)
-            is VoiceSessionState.Listening -> Triple(0.5f, 1.0f, ANIM_DURATION_THINKING)
-            VoiceSessionState.Speaking -> Triple(0.6f, 1.0f, ANIM_DURATION_SPEAKING)
-            is VoiceSessionState.Processing -> Triple(0.4f, 0.9f, ANIM_DURATION_THINKING)
-            VoiceSessionState.Error -> Triple(0.8f, 0.3f, 500L)
+            VoiceSessionState.IDLE -> Triple(0.3f, 0.7f, ANIM_DURATION_IDLE)
+            VoiceSessionState.LISTENING -> Triple(0.5f, 1.0f, ANIM_DURATION_THINKING)
+            VoiceSessionState.SPEAKING -> Triple(0.6f, 1.0f, ANIM_DURATION_SPEAKING)
+            VoiceSessionState.THINKING -> Triple(0.4f, 0.9f, ANIM_DURATION_THINKING)
+            VoiceSessionState.ERROR_RECOVERY -> Triple(0.8f, 0.3f, 500L)
             else -> Triple(0.3f, 0.7f, ANIM_DURATION_IDLE)
         }
 
         val animator = ValueAnimator.ofFloat(startAlpha, endAlpha).apply {
             this.duration = duration
-            repeatCount = if (state == VoiceSessionState.Idle) ValueAnimator.INFINITE else ValueAnimator.INFINITE
+            repeatCount = ValueAnimator.INFINITE
             repeatMode = ValueAnimator.REVERSE
             addUpdateListener { animation ->
                 currentAlpha = animation.animatedValue as Float
