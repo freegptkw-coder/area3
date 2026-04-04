@@ -151,26 +151,28 @@ class AndroidSpeechPartialGateway(
     }
 
     private var lastActivityMs: Long = 0L
-    private val watchdogRunnable = Runnable {
-        if (!listening || !running) return@Runnable
-        val now = System.currentTimeMillis()
-        if (now - lastActivityMs > watchdogTimeoutMs) {
-            // Hung - force recovery
-            com.aria.assistant.live.core.PersistentLogger.log(
-                appContext,
-                "STT_WATCHDOG",
-                "STT hung detected. Forcing recovery. Last activity: ${now - lastActivityMs}ms ago"
-            )
-            onEvent(SttTranscriptEvent.Timeout)
-            listening = false
-            mainHandler.removeCallbacks(this)
-            runCatching { 
-                recognizer?.cancel()
-                recognizer?.stopListening()
+    private val watchdogRunnable: Runnable = object : Runnable {
+        override fun run() {
+            if (!listening || !running) return
+            val now = System.currentTimeMillis()
+            if (now - lastActivityMs > watchdogTimeoutMs) {
+                // Hung - force recovery
+                com.aria.assistant.live.core.PersistentLogger.log(
+                    appContext,
+                    "STT_WATCHDOG",
+                    "STT hung detected. Forcing recovery. Last activity: ${now - lastActivityMs}ms ago"
+                )
+                onEvent(SttTranscriptEvent.Timeout)
+                listening = false
+                mainHandler.removeCallbacks(this)
+                runCatching { 
+                    recognizer?.cancel()
+                    recognizer?.stopListening()
+                }
+                scheduleRestart(800L)
+            } else {
+                mainHandler.postDelayed(this, 1500L) // Check more frequently
             }
-            scheduleRestart(800L)
-        } else {
-            mainHandler.postDelayed(this.watchdogRunnable, 1500L) // Check more frequently
         }
     }
 

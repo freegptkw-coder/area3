@@ -8,7 +8,8 @@
       "Edit(app/src/main/**)",
       "Bash(mkdir -p /root/area-2/app/src/main/res/xml)",
       "Bash(tail:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git push:*)"
     ]
   }
 }
