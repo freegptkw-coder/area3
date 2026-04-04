@@ -50,6 +50,21 @@ class LiveModeService : Service() {
         var onProactiveTextEvent: ((String) -> Unit)? = null
     }
 
+    private fun handleVoiceStateTransition(from: VoiceSessionState, to: VoiceSessionState) {
+        val isListening = to == VoiceSessionState.LISTENING || to == VoiceSessionState.PARTIAL_TRANSCRIPTION
+        val wasListening = from == VoiceSessionState.LISTENING || from == VoiceSessionState.PARTIAL_TRANSCRIPTION
+
+        if (isListening && !wasListening) {
+            if (running) {
+                runCatching { sttGateway?.start() }.onFailure {
+                    AuditLogger.log(this, "stt_resume_error:${it.javaClass.simpleName}")
+                }
+            }
+        } else if (!isListening && wasListening) {
+            runCatching { sttGateway?.stop() }
+        }
+    }
+
     private fun startTaskEventBridge() {
         taskEventBridgeJob?.cancel()
         taskEventBridgeJob = serviceScope.launch {
@@ -190,6 +205,7 @@ class LiveModeService : Service() {
                 "voice_state:${from.name.lowercase()}->${to.name.lowercase()}:${event.compactName()}"
             )
             publishSttDebugStatus(voiceStateOverride = toLabel)
+            handleVoiceStateTransition(from, to)
         }
         bargeInController = BargeInController()
         audioFocusArbiter = AudioFocusArbiter(this) { state, rawChange ->
@@ -381,17 +397,6 @@ class LiveModeService : Service() {
         ttsPlayer = StreamingTtsPlayer().also { it.start() }
         speechOutputArbiter?.attachStreamingPlayer(ttsPlayer)
         speechOutputArbiter?.attachLocalSpeaker(localTtsSpeaker)
-        runCatching { sttGateway?.start() }
-            .onFailure {
-                AuditLogger.log(this, "stt_start_error:${it.javaClass.simpleName}")
-                val snapshot = sttHealthTracker.onRecoverableError()
-                applySttHealthSnapshot(snapshot)
-                sttAvailabilityStatus = "start_error"
-                publishSttDebugStatus()
-                if (snapshot.shouldScheduleRetry) {
-                    scheduleSttRetry(snapshot.cooldownMs, "initial_start_error")
-                }
-            }
 
         if (ConsentStore.isAvatarEnabled(this)) {
             avatarOverlay = LiveAvatarOverlay(this).also { it.show() }

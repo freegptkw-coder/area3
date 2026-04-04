@@ -3,6 +3,7 @@ package com.aria.assistant.live
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.media.audiofx.AcousticEchoCanceler
 import com.aria.assistant.live.core.AdaptiveVadEngine
 import kotlin.math.sqrt
 
@@ -28,22 +29,32 @@ class SafeAudioRecorder(
         .coerceAtLeast(4096)
 
     private var audioRecord: AudioRecord? = null
+    private var echoCanceler: AcousticEchoCanceler? = null
     private var adaptiveVad: AdaptiveVadEngine? = null
 
     fun start() {
         if (audioRecord != null) return
         audioRecord = AudioRecord(
-            MediaRecorder.AudioSource.VOICE_COMMUNICATION,
+            MediaRecorder.AudioSource.VOICE_RECOGNITION,
             sampleRate,
             channelConfig,
             encoding,
             minBuffer
         )
+        
+        val sessionId = audioRecord?.audioSessionId
+        if (sessionId != null && AcousticEchoCanceler.isAvailable()) {
+            echoCanceler = AcousticEchoCanceler.create(sessionId)
+            echoCanceler?.enabled = true
+        }
+        
         audioRecord?.startRecording()
         adaptiveVad = if (enableAdaptiveVad) AdaptiveVadEngine() else null
     }
 
     fun stop() {
+        runCatching { echoCanceler?.release() }
+        echoCanceler = null
         runCatching { audioRecord?.stop() }
         runCatching { audioRecord?.release() }
         audioRecord = null
