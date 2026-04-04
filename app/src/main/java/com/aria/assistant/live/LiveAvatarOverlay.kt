@@ -2,6 +2,7 @@ package com.aria.assistant.live
 
 import android.animation.ObjectAnimator
 import android.content.Context
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.PixelFormat
 import android.os.Build
@@ -172,6 +173,7 @@ class LiveAvatarOverlay(private val context: Context) {
         var startY = 0
         var touchX = 0f
         var touchY = 0f
+        var isMoved = false
 
         view.setOnTouchListener { _, event ->
             when (event.action) {
@@ -180,12 +182,29 @@ class LiveAvatarOverlay(private val context: Context) {
                     startY = params.y
                     touchX = event.rawX
                     touchY = event.rawY
+                    isMoved = false
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    params.x = startX + (event.rawX - touchX).toInt()
-                    params.y = startY + (event.rawY - touchY).toInt()
-                    runCatching { wm.updateViewLayout(view, params) }
+                    val dx = Math.abs(event.rawX - touchX)
+                    val dy = Math.abs(event.rawY - touchY)
+                    if (dx > 10 || dy > 10) {
+                        isMoved = true
+                        params.x = startX + (event.rawX - touchX).toInt()
+                        params.y = startY + (event.rawY - touchY).toInt()
+                        runCatching { wm.updateViewLayout(view, params) }
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (!isMoved) {
+                        // Handle click: Launch AssistantActivity
+                        val intent = Intent(context, com.aria.assistant.AssistantActivity::class.java).apply {
+                            action = Intent.ACTION_ASSIST
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                        }
+                        runCatching { context.startActivity(intent) }
+                    }
                     true
                 }
                 else -> false

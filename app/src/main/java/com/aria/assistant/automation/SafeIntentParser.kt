@@ -49,6 +49,32 @@ object SafeIntentParser {
     fun parseFromUserVoiceOrText(input: String): ParsedAutomationCommand? {
         val text = input.lowercase(Locale.getDefault())
 
+        if (text.contains("good morning") || text.contains("shuvo sokal") || text.contains("suprovat")) {
+            val routineTasks = listOf(
+                SafeTask(
+                    type = SafeTaskTypes.READ_INCOMING_SMS,
+                    enabled = true,
+                    riskLevel = "low",
+                    requireConfirmation = false
+                ),
+                SafeTask(
+                    type = SafeTaskTypes.LAUNCH_MULTIPLE_APPS,
+                    targetApps = listOf("youtube"),
+                    riskLevel = "low",
+                    requireConfirmation = false
+                )
+            )
+            return ParsedAutomationCommand(
+                envelope = SafeIntentEnvelope(
+                    action = SafeIntentActions.AUTOMATION_REQUEST,
+                    tasks = routineTasks,
+                    source = "routine_macro"
+                ),
+                acknowledgement = "Good morning! Shuvo sokal. Ami apnar notun SMS gulo pore shonacchi ebong YouTube chalu kore dicchi.",
+                fromVoiceHeuristic = true
+            )
+        }
+
         if (isEmpathicStatusOnly(text)) {
             return ParsedAutomationCommand(
                 envelope = SafeIntentEnvelope(action = SafeIntentActions.AUTOMATION_REQUEST, tasks = emptyList(), source = "voice"),

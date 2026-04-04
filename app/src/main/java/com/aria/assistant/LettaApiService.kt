@@ -116,6 +116,18 @@ class LettaApiService(private val context: Context) {
         val banglaModeEnabled = prefs.getBoolean("bangla_mode", true)
         val hasBanglaText = message.any { it.code in 0x0980..0x09FF }
         val wantsBangla = hasBanglaText || message.lowercase().contains("bangla") || message.contains("বাংলা")
+        val lowerMessage = message.lowercase()
+        val wantsScreenContext = lowerMessage.contains("screen") || lowerMessage.contains("what am i looking at") || lowerMessage.contains("what is this")
+
+        var finalUserMessage = message
+        if (wantsScreenContext) {
+            val screenText = ARIAAccessibilityService.instance?.readScreen()
+            if (!screenText.isNullOrBlank()) {
+                finalUserMessage += "\n\n[System Context: The user's screen currently contains the following text:\n$screenText\n]"
+            } else {
+                finalUserMessage += "\n\n[System Context: Screen reading is currently unavailable. Ask the user to ensure Accessibility Service is enabled.]"
+            }
+        }
 
         var systemPrompt = PersonalityPrompts.getSystemPrompt(personality, userName, nickname)
         systemPrompt += """
@@ -162,7 +174,7 @@ class LettaApiService(private val context: Context) {
             selectedProvider = selectedProvider,
             selectedModel = selectedModel,
             systemPrompt = systemPrompt,
-            message = message,
+            message = finalUserMessage,
             historyMessages = historyMessages
         )
     }
