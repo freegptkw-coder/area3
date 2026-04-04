@@ -400,20 +400,40 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 description = "AI response in progress"
             )
         ) {
-            updateProgress(15, "Contacting AI provider")
-            val response = lettaService.sendMessage(message)
-            updateProgress(70, "Response received")
+            updateProgress(15, "Thinking...")
+
+            var currentMessageIndex = -1
+            val responseBuilder = java.lang.StringBuilder()
+
+            val response = lettaService.streamMessage(message, liveShortResponse = false) { chunk ->
+                runOnUiThread {
+                    if (currentMessageIndex == -1) {
+                        if (chatAdapter.getItemCountCurrent() > 0) {
+                            chatAdapter.removeLastMessage() // Remove "Processing..."
+                        }
+                        chatAdapter.addMessage(ChatMessage(text = chunk, sender = ChatMessage.SenderType.ASSISTANT))
+                        currentMessageIndex = chatAdapter.getItemCountCurrent() - 1
+                    } else {
+                        chatAdapter.appendChunkToLastMessage(chunk)
+                        scrollToBottom()
+                    }
+                }
+            }
+
+            updateProgress(70, "Response finished")
 
             withContext(Dispatchers.Main) {
-                if (chatAdapter.getItemCountCurrent() > 0) {
-                    chatAdapter.removeLastMessage()
+                if (currentMessageIndex == -1) {
+                    if (chatAdapter.getItemCountCurrent() > 0) {
+                        chatAdapter.removeLastMessage() // Remove "Processing..."
+                    }
+                    addAssistantMessage(response.text)
                 }
 
                 val parsedAssistant = VoiceCommandParser.parseAssistantJson(response.text)
                 if (parsedAssistant != null) {
                     handleParsedAutomation(parsedAssistant)
                 } else {
-                    addAssistantMessage(response.text)
                     enqueueSpeech(response.text)
                 }
 

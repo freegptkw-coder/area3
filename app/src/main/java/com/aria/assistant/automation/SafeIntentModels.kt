@@ -19,7 +19,10 @@ data class SafeTask(
     @SerializedName("content") val content: String? = null,
     @SerializedName("enabled") val enabled: Boolean? = null,
     @SerializedName("require_confirmation") val requireConfirmation: Boolean? = null,
-    @SerializedName("risk_level") val riskLevel: String? = null
+    @SerializedName("risk_level") val riskLevel: String? = null,
+    @SerializedName("hardware_type") val hardwareType: String? = null,
+    @SerializedName("hardware_state") val hardwareState: Boolean? = null,
+    @SerializedName("memory_fact") val memoryFact: String? = null
 )
 
 data class ParsedAutomationCommand(
@@ -46,4 +49,6 @@ object SafeTaskTypes {
     const val SEND_SMS = "send_sms"
     const val SOCIAL_POST = "social_post"
     const val CONTACT_EDIT = "contact_edit"
+    const val SAVE_MEMORY = "save_memory"
+    const val TOGGLE_HARDWARE = "toggle_hardware"
 }

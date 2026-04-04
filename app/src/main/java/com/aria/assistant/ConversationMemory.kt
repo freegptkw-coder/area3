@@ -14,6 +14,7 @@ data class Message(
 object ConversationMemory {
     private const val PREFS_NAME = "ARIA_MEMORY"
     private const val KEY_MESSAGES = "conversation_messages"
+    private const val KEY_FACTS = "long_term_memories"
     private const val MAX_MESSAGES = 40 // Keep last 40 messages
     
     private val gson = Gson()
@@ -32,6 +33,26 @@ object ConversationMemory {
         saveMessages(context, trimmed)
     }
     
+    fun saveFact(context: Context, fact: String) {
+        val facts = getFacts(context).toMutableList()
+        if (!facts.contains(fact)) {
+            facts.add(fact)
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit().putString(KEY_FACTS, gson.toJson(facts)).apply()
+        }
+    }
+    
+    fun getFacts(context: Context): List<String> {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val json = prefs.getString(KEY_FACTS, "[]") ?: "[]"
+        return try {
+            val type = object : TypeToken<List<String>>() {}.type
+            gson.fromJson(json, type) ?: emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
     fun getMessages(context: Context): List<Message> {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val json = prefs.getString(KEY_MESSAGES, "[]") ?: "[]"
@@ -50,17 +71,27 @@ object ConversationMemory {
     }
     
     fun getConversationHistoryForAPI(context: Context): String {
+        val facts = getFacts(context)
+        val memoryBlock = if (facts.isNotEmpty()) {
+            "\n[LONG-TERM MEMORIES (Saved Facts about user):\n${facts.joinToString("\n- ")}]\n"
+        } else ""
+
         val messages = getMessages(context)
-        if (messages.isEmpty()) return ""
+        if (messages.isEmpty() && memoryBlock.isEmpty()) return ""
         
         val history = StringBuilder()
-        messages.forEach { msg ->
-            when(msg.role) {
-                "user" -> history.append("User: ${msg.content}\n")
-                "assistant" -> history.append("ARIA: ${msg.content}\n")
+        history.append(memoryBlock)
+        
+        if (messages.isNotEmpty()) {
+            history.append("\nPrevious conversation:\n")
+            messages.forEach { msg ->
+                when(msg.role) {
+                    "user" -> history.append("User: ${msg.content}\n")
+                    "assistant" -> history.append("ARIA: ${msg.content}\n")
+                }
             }
         }
-        return "\n\nPrevious conversation:\n$history"
+        return history.toString()
     }
     
     fun clearHistory(context: Context) {

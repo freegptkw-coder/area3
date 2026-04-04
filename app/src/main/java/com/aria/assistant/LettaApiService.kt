@@ -138,6 +138,10 @@ class LettaApiService(private val context: Context) {
             - Preferred JSON formats:
               1) {"action":"launch_multiple_apps","target_apps":["whatsapp","chrome"]}
               2) {"action":"automation_request","tasks":[{"type":"read_incoming_sms","enabled":true,"risk_level":"low","require_confirmation":false}]}
+              3) {"action":"automation_request","tasks":[{"type":"save_memory","memory_fact":"User loves coffee"}]}
+              4) {"action":"automation_request","tasks":[{"type":"toggle_hardware","hardware_type":"flashlight","hardware_state":true}]}
+            - Supported hardware_type: "wifi", "bluetooth", "flashlight". hardware_state: true/false.
+            - Save important facts about the user using "save_memory" when they tell you something to remember for the future.
             - Sensitive tasks (send_sms, social_post, contact_edit) must set "require_confirmation": true.
         """.trimIndent()
         if (banglaModeEnabled && wantsBangla) {

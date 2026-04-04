@@ -15,6 +15,14 @@ class ChatAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
         notifyItemInserted(messages.size - 1)
     }
 
+    fun appendChunkToLastMessage(chunk: String) {
+        if (messages.isNotEmpty()) {
+            val position = messages.size - 1
+            messages[position].text += chunk
+            notifyItemChanged(position)
+        }
+    }
+
     fun removeLastMessage() {
         if (messages.isNotEmpty()) {
             val position = messages.size - 1

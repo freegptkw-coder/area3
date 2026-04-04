@@ -89,6 +89,32 @@ class SafeAutomationExecutor(private val context: Context) {
                     AutomationAuditLogger.log(context, "social_post:compose:${task.platform.orEmpty()}")
                 }
 
+                SafeTaskTypes.SAVE_MEMORY -> {
+                    task.memoryFact?.let { fact ->
+                        com.aria.assistant.ConversationMemory.saveFact(context, fact)
+                        executed++
+                        details += "save_memory:$fact"
+                        AutomationAuditLogger.log(context, "save_memory_fact_saved")
+                    } ?: run {
+                        blocked++
+                        AutomationAuditLogger.log(context, "save_memory_blocked:missing_fact")
+                    }
+                }
+
+                SafeTaskTypes.TOGGLE_HARDWARE -> {
+                    val hwType = task.hardwareType.orEmpty().lowercase()
+                    val hwState = task.hardwareState ?: true
+                    when (hwType) {
+                        "wifi" -> toggleWifi(hwState)
+                        "bluetooth" -> toggleBluetooth(hwState)
+                        "flashlight", "torch" -> toggleFlashlight(hwState)
+                        else -> blocked++
+                    }
+                    executed++
+                    details += "toggle_hardware:$hwType=$hwState"
+                    AutomationAuditLogger.log(context, "toggle_hardware:$hwType=$hwState")
+                }
+
                 else -> {
                     blocked++
                     details += "blocked:${task.type}:unsupported"
@@ -169,5 +195,29 @@ class SafeAutomationExecutor(private val context: Context) {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         runCatching { context.startActivity(chooser) }
+    }
+
+    private fun toggleFlashlight(enabled: Boolean) {
+        try {
+            val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as android.hardware.camera2.CameraManager
+            val cameraId = cameraManager.cameraIdList[0]
+            cameraManager.setTorchMode(cameraId, enabled)
+        } catch (e: Exception) {
+            // Ignore
+        }
+    }
+    
+    private fun toggleBluetooth(enabled: Boolean) {
+        val intent = Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        runCatching { context.startActivity(intent) }
+    }
+
+    private fun toggleWifi(enabled: Boolean) {
+        val intent = Intent(android.provider.Settings.ACTION_WIFI_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        runCatching { context.startActivity(intent) }
     }
 }

@@ -2,7 +2,7 @@ package com.aria.assistant
 
 data class ChatMessage(
     val id: String = java.util.UUID.randomUUID().toString(),
-    val text: String,
+    var text: String,
     val sender: SenderType
 ) {
     enum class SenderType {
