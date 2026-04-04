@@ -8,9 +8,12 @@ import android.media.MediaPlayer
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
+import com.aria.assistant.live.core.LiveEventBus
+import com.aria.assistant.live.core.VoiceSessionEvent
+import com.aria.assistant.live.core.VoiceSessionState
+import kotlinx.coroutines.flow.collect
+import com.aria.assistant.live.core.StreamingSttGateway
+import com.aria.assistant.live.core.SttTranscriptEvent
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.widget.EditText
@@ -51,7 +54,8 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var taskManagerButton: MaterialButton
     private lateinit var partialResultText: TextView
     
-    private lateinit var speechRecognizer: SpeechRecognizer
+    private var sttGateway: StreamingSttGateway? = null
+    private var isLocalSttListening = false
     private lateinit var tts: TextToSpeech
     private var ttsReady = false
     private var mediaPlayer: MediaPlayer? = null
@@ -74,6 +78,8 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var recognitionRetryCount = 0
     private val maxRecognitionRetry = 2
     private var manualMicTriggerUntilMs: Long = 0L
+    
+    private var liveEventJob: Job? = null
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -112,12 +118,27 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             override fun onError(utteranceId: String?) { runOnUiThread { onSpeechFinished() } }
         })
         
-        // Initialize Speech Recognizer
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
-        setupSpeechRecognizer()
+        // Initialize Streaming STT Gateway for Gemini-like continuous listening
+        sttGateway = StreamingSttGateway.createDefault(this) { event ->
+            runOnUiThread { handleLocalSttEvent(event) }
+        }
         
         // Check permissions
         checkPermissions()
+        
+        // Listen to LiveEventBus for true duplex Gemini-like frontend
+        liveEventJob = CoroutineScope(Dispatchers.Main).launch {
+            launch {
+                LiveEventBus.events.collect { event ->
+                    handleLiveEvent(event)
+                }
+            }
+            launch {
+                LiveEventBus.state.collect { state ->
+                    handleLiveState(state)
+                }
+            }
+        }
         
         // Set up button listeners
         sendButton.setOnClickListener {
@@ -138,11 +159,28 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         
         voiceButton.setOnClickListener {
             manualMicTriggerUntilMs = System.currentTimeMillis() + 20_000L
-            startVoiceRecognition()
+            val liveEnabled = getSharedPreferences("ARIA_PREFS", Context.MODE_PRIVATE)
+                .getBoolean("live_mode_enabled", false)
+            if (liveEnabled) {
+                // Tell the background service to start listening
+                CoroutineScope(Dispatchers.IO).launch {
+                    LiveEventBus.commands.emit("start_mic")
+                }
+            } else {
+                startVoiceRecognition()
+            }
         }
 
         stopSpeakButton.setOnClickListener {
-            stopCurrentSpeech()
+            val liveEnabled = getSharedPreferences("ARIA_PREFS", Context.MODE_PRIVATE)
+                .getBoolean("live_mode_enabled", false)
+            if (liveEnabled) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    LiveEventBus.commands.emit("stop_speak")
+                }
+            } else {
+                stopCurrentSpeech()
+            }
         }
         
         // Welcome message
@@ -152,6 +190,70 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         healthHandler.postDelayed(heartbeatRunnable, 60_000)
     }
     
+    private fun handleLiveEvent(event: VoiceSessionEvent) {
+        when (event) {
+            is VoiceSessionEvent.SttPartial -> {
+                partialResultText.visibility = android.view.View.VISIBLE
+                partialResultText.text = event.text
+            }
+            is VoiceSessionEvent.SttFinal -> {
+                partialResultText.visibility = android.view.View.GONE
+                addUserMessage(event.text)
+            }
+            is VoiceSessionEvent.AssistantAudioStarted -> {
+                voiceButton.visibility = android.view.View.GONE
+                stopSpeakButton.visibility = android.view.View.VISIBLE
+            }
+            VoiceSessionEvent.AssistantAudioFinished -> {
+                stopSpeakButton.visibility = android.view.View.GONE
+                voiceButton.visibility = android.view.View.VISIBLE
+            }
+            is VoiceSessionEvent.LlmResponseChunk -> {
+                if (currentLiveMessageIndex == -1) {
+                    if (chatAdapter.getItemCountCurrent() > 0) {
+                        chatAdapter.removeLastMessage() // Remove any generic processing indicator
+                    }
+                    chatAdapter.addMessage(ChatMessage(text = event.text, sender = ChatMessage.SenderType.ASSISTANT))
+                    currentLiveMessageIndex = chatAdapter.getItemCountCurrent() - 1
+                } else {
+                    chatAdapter.appendChunkToLastMessage(event.text)
+                    scrollToBottom()
+                }
+            }
+            VoiceSessionEvent.SessionStopped -> {
+                currentLiveMessageIndex = -1
+            }
+            is VoiceSessionEvent.LlmRequestStarted -> {
+                currentLiveMessageIndex = -1
+                addAssistantMessage("Thinking...")
+            }
+            else -> {}
+        }
+    }
+
+    private var currentLiveMessageIndex = -1
+
+    private fun handleLiveState(state: VoiceSessionState) {
+        when (state) {
+            VoiceSessionState.LISTENING -> {
+                voiceButton.text = "🔴"
+                setVoiceStatus("🎧 Listening...")
+            }
+            VoiceSessionState.SPEAKING -> {
+                setVoiceStatus("🤖 Speaking...")
+            }
+            VoiceSessionState.THINKING -> {
+                setVoiceStatus("🧠 Thinking...")
+            }
+            VoiceSessionState.IDLE -> {
+                voiceButton.text = "🎤"
+                setVoiceStatus("🔇 Idle")
+            }
+            else -> {
+                setVoiceStatus("⏱️ ${state.name}")
+            }
+        }
+    }
     private fun checkPermissions() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) 
             != PackageManager.PERMISSION_GRANTED) {
@@ -163,66 +265,43 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
     
-    private fun setupSpeechRecognizer() {
-        speechRecognizer.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(params: Bundle?) {
+    private fun handleLocalSttEvent(event: SttTranscriptEvent) {
+        when (event) {
+            SttTranscriptEvent.ListeningStarted -> {
                 voiceButton.text = "🔴"
                 setVoiceStatus("🎧 Listening...")
                 partialResultText.text = "Listening to your voice..."
                 partialResultText.visibility = android.view.View.VISIBLE
+                isLocalSttListening = true
             }
-            
-            override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(rmsdB: Float) {}
-            override fun onBufferReceived(buffer: ByteArray?) {}
-            override fun onEndOfSpeech() {
+            SttTranscriptEvent.ListeningStopped -> {
                 voiceButton.text = "🎤"
                 partialResultText.visibility = android.view.View.GONE
+                isLocalSttListening = false
+                if (!ttsReady) setVoiceStatus("🔇 Idle")
             }
-            
-            override fun onError(error: Int) {
+            is SttTranscriptEvent.Partial -> {
+                partialResultText.text = event.text
+                partialResultText.visibility = android.view.View.VISIBLE
+            }
+            is SttTranscriptEvent.Final -> {
+                val matches = event.text
                 voiceButton.text = "🎤"
                 partialResultText.visibility = android.view.View.GONE
-                val reason = speechErrorReason(error)
-                setVoiceStatus("⚠️ Mic error $error: $reason")
-                Toast.makeText(this@AssistantActivity, "Voice error $error: $reason", Toast.LENGTH_SHORT).show()
-
-                if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
-                    checkPermissions()
-                    return
-                }
-
-                if (shouldRetryRecognition(error) && recognitionRetryCount < maxRecognitionRetry) {
-                    recognitionRetryCount++
-                    recreateSpeechRecognizer()
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        startVoiceRecognition()
-                    }, 650)
-                } else {
-                    recognitionRetryCount = 0
-                }
-            }
-            
-            override fun onResults(results: Bundle?) {
-                voiceButton.text = "🎤"
-                partialResultText.visibility = android.view.View.GONE
-                recognitionRetryCount = 0
-                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                if (matches != null && matches.isNotEmpty()) {
-                    val rawText = matches[0]
+                if (matches.isNotEmpty()) {
                     val prefs = getSharedPreferences("ARIA_PREFS", Context.MODE_PRIVATE)
                     val wakeWordEnabled = prefs.getBoolean("wake_word_enabled", false)
                     val manualTriggered = System.currentTimeMillis() <= manualMicTriggerUntilMs
 
-                    var finalText = rawText
+                    var finalText = matches
                     if (wakeWordEnabled && !manualTriggered) {
-                        val lower = rawText.lowercase(Locale.getDefault())
+                        val lower = matches.lowercase(Locale.getDefault())
                         val hasWakeWord = lower.contains("hey aria") || lower.contains("hi aria") || lower.startsWith("aria")
                         if (!hasWakeWord) {
                             Toast.makeText(this@AssistantActivity, "Wake word on: bolo 'Hey ARIA'", Toast.LENGTH_SHORT).show()
                             return
                         }
-                        finalText = rawText
+                        finalText = matches
                             .replace(Regex("(?i)^\\s*(hey|hi)?\\s*aria[,! ]*"), "")
                             .trim()
                         if (finalText.isBlank()) {
@@ -239,16 +318,24 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     sendMessage(finalText)
                 }
             }
-            
-            override fun onPartialResults(partialResults: Bundle?) {
-                val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                if (matches != null && matches.isNotEmpty()) {
-                    val rawText = matches[0]
-                    partialResultText.text = rawText
+            is SttTranscriptEvent.Error -> {
+                val reason = event.reason
+                voiceButton.text = "🎤"
+                partialResultText.visibility = android.view.View.GONE
+                setVoiceStatus("⚠️ Mic error: $reason")
+                Toast.makeText(this@AssistantActivity, "Voice error: $reason", Toast.LENGTH_SHORT).show()
+                if (event.code == 9) { // ERROR_INSUFFICIENT_PERMISSIONS
+                    checkPermissions()
                 }
             }
-            override fun onEvent(eventType: Int, params: Bundle?) {}
-        })
+            SttTranscriptEvent.Timeout -> {
+                // Ignore timeout visually, gateway handles restart if needed
+            }
+            SttTranscriptEvent.Unavailable -> {
+                setVoiceStatus("⚠️ Mic unavailable")
+                Toast.makeText(this@AssistantActivity, "Voice recognition unavailable", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
     
     private fun startVoiceRecognition() {
@@ -260,27 +347,21 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             return
         }
 
-        val prefs = getSharedPreferences("ARIA_PREFS", Context.MODE_PRIVATE)
-        val selectedLang = prefs.getString("speech_recognition_lang", "auto") ?: "auto"
-        val languageCode = when (selectedLang) {
-            "bn-BD" -> "bn-BD"
-            "en-US" -> "en-US"
-            else -> Locale.getDefault().toLanguageTag()
-        }
-
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, languageCode)
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
-        }
-
-        try {
-            setVoiceStatus("🎧 Starting mic...")
-            speechRecognizer.startListening(intent)
-        } catch (_: Exception) {
-            recreateSpeechRecognizer()
-            Toast.makeText(this, "Mic service restarted, try again", Toast.LENGTH_SHORT).show()
+        val liveEnabled = getSharedPreferences("ARIA_PREFS", Context.MODE_PRIVATE)
+            .getBoolean("live_mode_enabled", false)
+        if (liveEnabled) {
+            CoroutineScope(Dispatchers.IO).launch {
+                LiveEventBus.commands.emit("start_mic")
+            }
+        } else {
+            if (isLocalSttListening) {
+                sttGateway?.stop()
+            } else {
+                setVoiceStatus("🎧 Starting mic...")
+                sttGateway?.start()
+                // Fake trigger VAD so it doesn't wait
+                sttGateway?.onVoiceActivity(true)
+            }
         }
     }
 
@@ -328,40 +409,6 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
-    private fun shouldRetryRecognition(error: Int): Boolean {
-        return error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT ||
-            error == SpeechRecognizer.ERROR_NETWORK ||
-            error == SpeechRecognizer.ERROR_SERVER ||
-            error == SpeechRecognizer.ERROR_CLIENT ||
-            error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ||
-            error == SpeechRecognizer.ERROR_NO_MATCH ||
-            error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
-    }
-
-    private fun speechErrorReason(error: Int): String {
-        return when (error) {
-            SpeechRecognizer.ERROR_AUDIO -> "audio input problem"
-            SpeechRecognizer.ERROR_CLIENT -> "client busy"
-            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "permission missing"
-            SpeechRecognizer.ERROR_NETWORK -> "network issue"
-            SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "network timeout"
-            SpeechRecognizer.ERROR_NO_MATCH -> "could not understand"
-            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "recognizer busy"
-            SpeechRecognizer.ERROR_SERVER -> "server error"
-            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "no speech detected"
-            else -> "unknown"
-        }
-    }
-
-    private fun recreateSpeechRecognizer() {
-        try {
-            speechRecognizer.destroy()
-        } catch (_: Exception) {
-        }
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
-        setupSpeechRecognizer()
-    }
-    
     private fun sendMessage(message: String) {
         // Add user message to chat
         addUserMessage(message)
@@ -778,6 +825,6 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         mediaPlayer?.release()
         tts.stop()
         tts.shutdown()
-        speechRecognizer.destroy()
+        sttGateway?.stop()
     }
 }

@@ -9,6 +9,7 @@ import android.os.IBinder
 import androidx.core.content.ContextCompat
 import com.aria.assistant.RootCommandExecutor
 import com.aria.assistant.live.core.LiveDialogOrchestrator
+import com.aria.assistant.live.core.LiveEventBus
 import com.aria.assistant.live.core.LiveSpeechOutputArbiter
 import com.aria.assistant.live.core.ProviderStreamingGateway
 import com.aria.assistant.live.core.ResponseStreamCoordinator
@@ -206,6 +207,12 @@ class LiveModeService : Service() {
             )
             publishSttDebugStatus(voiceStateOverride = toLabel)
             handleVoiceStateTransition(from, to)
+            
+            // Broadcast to front-end UI
+            serviceScope.launch {
+                LiveEventBus.state.value = to
+                LiveEventBus.events.tryEmit(event)
+            }
         }
         bargeInController = BargeInController()
         audioFocusArbiter = AudioFocusArbiter(this) { state, rawChange ->
@@ -286,6 +293,24 @@ class LiveModeService : Service() {
             handleSttTranscriptEvent(event)
         }
         publishSttDebugStatus(voiceStateOverride = "idle")
+        
+        serviceScope.launch {
+            LiveEventBus.commands.collect { cmd ->
+                when (cmd) {
+                    "stop_speak" -> {
+                        interruptAssistantSpeech("user_ui_stop")
+                    }
+                    "start_mic" -> {
+                        if (!running) {
+                            ConsentStore.startSession(this@LiveModeService, 240)
+                            startPipelines()
+                        } else {
+                            runCatching { sttGateway?.start() }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

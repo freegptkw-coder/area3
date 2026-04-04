@@ -88,6 +88,7 @@ object ConversationMemory {
                 when(msg.role) {
                     "user" -> history.append("User: ${msg.content}\n")
                     "assistant" -> history.append("ARIA: ${msg.content}\n")
+                    "system" -> history.append("[System event: ${msg.content}]\n")
                 }
             }
         }

@@ -1,8 +1,11 @@
 package com.aria.assistant.automation
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.delay
 
 class SafeAutomationExecutor(private val context: Context) {
@@ -168,9 +171,27 @@ class SafeAutomationExecutor(private val context: Context) {
     }
 
     private fun composeSms(contact: String, body: String) {
-        val uri = Uri.parse("smsto:")
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED) {
+            try {
+                val smsManager = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                    context.getSystemService(android.telephony.SmsManager::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    android.telephony.SmsManager.getDefault()
+                }
+                
+                // For real app, contact would be parsed against phone book. If it's not a number, we fallback to intent.
+                if (contact.matches(Regex("^[+]?[0-9\\s\\-]+$"))) {
+                    smsManager.sendTextMessage(contact, null, body, null, null)
+                    return
+                }
+            } catch (e: Exception) {
+                // Fallback to intent
+            }
+        }
+        
+        val uri = Uri.parse("smsto:$contact")
         val intent = Intent(Intent.ACTION_SENDTO, uri).apply {
-            putExtra("address", contact)
             putExtra("sms_body", body)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
