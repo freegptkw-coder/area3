@@ -49,7 +49,7 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var sendButton: MaterialButton
     private lateinit var settingsButton: MaterialButton
     private lateinit var taskManagerButton: MaterialButton
-    private lateinit var voiceStatusText: TextView
+    private lateinit var partialResultText: TextView
     
     private lateinit var speechRecognizer: SpeechRecognizer
     private lateinit var tts: TextToSpeech
@@ -97,7 +97,8 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         sendButton = findViewById(R.id.sendButton)
         settingsButton = findViewById(R.id.settingsButton)
         taskManagerButton = findViewById(R.id.taskManagerButton)
-        voiceStatusText = findViewById(R.id.voiceStatusText)
+        partialResultText = findViewById(R.id.partialResultText)
+        val voiceStatusText: TextView = findViewById(R.id.voiceStatusText)
 
         AppHealthMonitor.consumeLastCrashSummary(this)?.let {
             addSystemMessage("Recovered from previous crash: $it")
@@ -167,6 +168,8 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             override fun onReadyForSpeech(params: Bundle?) {
                 voiceButton.text = "🔴"
                 setVoiceStatus("🎧 Listening...")
+                partialResultText.text = "Listening to your voice..."
+                partialResultText.visibility = android.view.View.VISIBLE
             }
             
             override fun onBeginningOfSpeech() {}
@@ -174,10 +177,12 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             override fun onBufferReceived(buffer: ByteArray?) {}
             override fun onEndOfSpeech() {
                 voiceButton.text = "🎤"
+                partialResultText.visibility = android.view.View.GONE
             }
             
             override fun onError(error: Int) {
                 voiceButton.text = "🎤"
+                partialResultText.visibility = android.view.View.GONE
                 val reason = speechErrorReason(error)
                 setVoiceStatus("⚠️ Mic error $error: $reason")
                 Toast.makeText(this@AssistantActivity, "Voice error $error: $reason", Toast.LENGTH_SHORT).show()
@@ -200,6 +205,7 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             
             override fun onResults(results: Bundle?) {
                 voiceButton.text = "🎤"
+                partialResultText.visibility = android.view.View.GONE
                 recognitionRetryCount = 0
                 val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 if (matches != null && matches.isNotEmpty()) {
@@ -234,7 +240,13 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 }
             }
             
-            override fun onPartialResults(partialResults: Bundle?) {}
+            override fun onPartialResults(partialResults: Bundle?) {
+                val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                if (matches != null && matches.isNotEmpty()) {
+                    val rawText = matches[0]
+                    partialResultText.text = rawText
+                }
+            }
             override fun onEvent(eventType: Int, params: Bundle?) {}
         })
     }
@@ -545,17 +557,32 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (isSpeakingNow || speechQueue.isEmpty()) return
         val next = speechQueue.removeFirst()
         isSpeakingNow = true
+        
+        runOnUiThread {
+            voiceButton.visibility = android.view.View.GONE
+            stopSpeakButton.visibility = android.view.View.VISIBLE
+        }
+        
         speakWithVoiceProvider(next)
     }
 
     private fun onSpeechFinished() {
         isSpeakingNow = false
         setVoiceStatus("🔇 Idle")
+        
+        runOnUiThread {
+            if (speechQueue.isEmpty()) {
+                stopSpeakButton.visibility = android.view.View.GONE
+                voiceButton.visibility = android.view.View.VISIBLE
+            }
+        }
+        
         processSpeechQueue()
     }
 
     private fun setVoiceStatus(status: String) {
-        voiceStatusText.text = status
+        val voiceStatusText: TextView? = findViewById(R.id.voiceStatusText)
+        voiceStatusText?.text = status
     }
 
     private fun canUseElevenLabs(charCount: Int): Boolean {
@@ -587,6 +614,12 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (ttsReady) tts.stop()
         speechQueue.clear()
         isSpeakingNow = false
+        
+        runOnUiThread {
+            stopSpeakButton.visibility = android.view.View.GONE
+            voiceButton.visibility = android.view.View.VISIBLE
+        }
+        
         setVoiceStatus("⏹ Stopped")
     }
 
