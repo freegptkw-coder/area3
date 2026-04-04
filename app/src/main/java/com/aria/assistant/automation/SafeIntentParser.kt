@@ -38,8 +38,8 @@ object SafeIntentParser {
         val cleanText = text.replace(json, "").replace("```json", "").replace("```", "").trim()
         val ack = cleanText.ifBlank {
             when (action) {
-                SafeIntentActions.LAUNCH_MULTIPLE_APPS -> "Thik ache, ami safe mode e app gulo launch kortesi."
-                else -> "Thik ache, safe automation request receive hoyeche."
+                SafeIntentActions.LAUNCH_MULTIPLE_APPS -> "Thik ache, ami app gulo launch kortesi."
+                else -> "Thik ache, automation request receive hoyeche."
             }
         }
 

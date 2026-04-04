@@ -137,7 +137,7 @@ class LettaApiService(private val context: Context) {
             - For device automation requests, respond with a warm Banglalish acknowledgement, then include a JSON object only using safe intents.
             - Preferred JSON formats:
               1) {"action":"launch_multiple_apps","target_apps":["whatsapp","chrome"]}
-              2) {"action":"automation_request","tasks":[{"type":"read_incoming_sms","enabled":true,"risk_level":"low","require_confirmation":false}]}
+              2) {"action":"automation_request","tasks":[{"type":"read_incoming_sms","enabled":true,"require_confirmation":false}]}
               3) {"action":"automation_request","tasks":[{"type":"save_memory","memory_fact":"User loves coffee"}]}
               4) {"action":"automation_request","tasks":[{"type":"toggle_hardware","hardware_type":"flashlight","hardware_state":true}]}
             - Supported hardware_type: "wifi", "bluetooth", "flashlight". hardware_state: true/false.
