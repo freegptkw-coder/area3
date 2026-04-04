@@ -34,6 +34,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var personalitySpinner: Spinner
     private lateinit var userNameInput: TextInputEditText
     private lateinit var nicknameInput: TextInputEditText
+    private lateinit var customSystemPromptInput: TextInputEditText
 
     // AI Provider
     private lateinit var providerSpinner: Spinner
@@ -103,6 +104,7 @@ class SettingsActivity : AppCompatActivity() {
         personalitySpinner = findViewById(R.id.personalitySpinner)
         userNameInput = findViewById(R.id.userNameInput)
         nicknameInput = findViewById(R.id.nicknameInput)
+        customSystemPromptInput = findViewById(R.id.customSystemPromptInput)
 
         providerSpinner = findViewById(R.id.providerSpinner)
         modelSpinner = findViewById(R.id.modelSpinner)
@@ -250,6 +252,7 @@ class SettingsActivity : AppCompatActivity() {
 
         userNameInput.setText(prefs.getString("user_name", ""))
         nicknameInput.setText(prefs.getString("nickname", ""))
+        customSystemPromptInput.setText(prefs.getString("custom_system_prompt", ""))
 
         val savedProvider = prefs.getString("ai_provider", "groq") ?: "groq"
         providerValues.indexOf(savedProvider).takeIf { it >= 0 }?.let { providerSpinner.setSelection(it) }
@@ -369,6 +372,7 @@ class SettingsActivity : AppCompatActivity() {
         val personality = personalityValues[personalitySpinner.selectedItemPosition]
         val userName = userNameInput.text.toString()
         val nickname = nicknameInput.text.toString()
+        val customSystemPrompt = customSystemPromptInput.text.toString()
         val provider = providerValues[providerSpinner.selectedItemPosition]
         val model = modelSpinner.selectedItem.toString()
         val apiKey = apiKeyInput.text.toString()
@@ -401,6 +405,7 @@ class SettingsActivity : AppCompatActivity() {
             putString("personality", personality)
             putString("user_name", userName)
             putString("nickname", nickname)
+            putString("custom_system_prompt", customSystemPrompt)
             putString("ai_provider", provider)
             putString("model", model)
             putString("api_key_enc", SecurePrefs.encrypt(apiKey))

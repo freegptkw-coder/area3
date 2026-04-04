@@ -111,6 +111,7 @@ class LettaApiService(private val context: Context) {
         val personality = prefs.getString("personality", "girlfriend") ?: "girlfriend"
         val userName = prefs.getString("user_name", "") ?: ""
         val nickname = prefs.getString("nickname", "") ?: ""
+        val customSystemPrompt = prefs.getString("custom_system_prompt", "") ?: ""
 
         val banglaModeEnabled = prefs.getBoolean("bangla_mode", true)
         val hasBanglaText = message.any { it.code in 0x0980..0x09FF }
@@ -132,6 +133,10 @@ class LettaApiService(private val context: Context) {
         }
         if (liveShortResponse) {
             systemPrompt += "\n\nLive voice mode rule: Keep replies short, fast, and spoken-language friendly. Prefer 1-3 short sentences unless the user asks for details."
+        }
+        
+        if (customSystemPrompt.isNotBlank()) {
+            systemPrompt += "\n\n[USER CUSTOM INSTRUCTION (Strictly follow this open-mindedly)]:\n$customSystemPrompt"
         }
 
         val historyMessages = ConversationMemory.getMessages(context)
