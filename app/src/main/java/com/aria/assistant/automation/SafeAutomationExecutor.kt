@@ -70,7 +70,8 @@ class SafeAutomationExecutor(private val context: Context) {
                     val enabled = task.enabled ?: true
                     setIncomingSmsRead(enabled)
                     executed++
-                    details += "read_incoming_sms:${if (enabled) "enabled" else "disabled"}"
+                    val summary = if (enabled) SmsTaskHandler.latestCompactSummary(context) else "disabled"
+                    details += "read_incoming_sms:${if (enabled) "enabled" else "disabled"}:$summary"
                     AutomationAuditLogger.log(context, "read_incoming_sms:${enabled}")
                 }
 

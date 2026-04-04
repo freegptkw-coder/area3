@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import com.aria.assistant.R
 
 object LiveNotification {
 
@@ -29,7 +30,7 @@ object LiveNotification {
         manager.createNotificationChannel(channel)
     }
 
-    fun build(context: Context): Notification {
+    fun build(context: Context, speaking: Boolean = false): Notification {
         val stopIntent = Intent(context, LiveModeService::class.java).apply {
             action = ACTION_STOP
         }
@@ -41,9 +42,9 @@ object LiveNotification {
         )
 
         return NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+            .setSmallIcon(if (speaking) R.drawable.ic_stat_aria_speaking else R.drawable.ic_stat_aria_listening)
             .setContentTitle("ARIA Live Mode")
-            .setContentText("Listening with consent. Tap Stop anytime.")
+            .setContentText(if (speaking) "Speaking now • Tap Stop anytime" else "Listening with consent. Tap Stop anytime.")
             .setOngoing(true)
             .addAction(0, "Stop", stopPendingIntent)
             .build()

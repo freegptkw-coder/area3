@@ -25,6 +25,11 @@ import androidx.core.content.ContextCompat
 import com.aria.assistant.automation.AutomationAuditLogger
 import com.aria.assistant.automation.ParsedAutomationCommand
 import com.aria.assistant.automation.SafeIntentEnvelope
+import com.aria.assistant.live.LiveTaskManagerActivity
+import com.aria.assistant.multitask.AriaTaskRuntime
+import com.aria.assistant.multitask.AriaTaskTypes
+import com.aria.assistant.multitask.TaskPriority
+import com.aria.assistant.multitask.TaskRequest
 import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,6 +49,7 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var stopSpeakButton: MaterialButton
     private lateinit var sendButton: MaterialButton
     private lateinit var settingsButton: MaterialButton
+    private lateinit var taskManagerButton: MaterialButton
     private lateinit var voiceStatusText: TextView
     
     private lateinit var speechRecognizer: SpeechRecognizer
@@ -62,6 +68,7 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
     
     private lateinit var lettaService: LettaApiService
+    private val taskOrchestrator = AriaTaskRuntime.orchestrator
     private var pendingConfirmationEnvelope: SafeIntentEnvelope? = null
     
     private val RECORD_AUDIO_PERMISSION = 100
@@ -85,6 +92,7 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         stopSpeakButton = findViewById(R.id.stopSpeakButton)
         sendButton = findViewById(R.id.sendButton)
         settingsButton = findViewById(R.id.settingsButton)
+        taskManagerButton = findViewById(R.id.taskManagerButton)
         voiceStatusText = findViewById(R.id.voiceStatusText)
 
         AppHealthMonitor.consumeLastCrashSummary(this)?.let {
@@ -117,6 +125,10 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         
         settingsButton.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
+        }
+
+        taskManagerButton.setOnClickListener {
+            startActivity(Intent(this, LiveTaskManagerActivity::class.java))
         }
         
         voiceButton.setOnClickListener {
@@ -376,43 +388,37 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         // Show processing indicator
         addAssistantMessage("Processing...")
         
-        // Send to AI API
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val response = lettaService.sendMessage(message)
-                
-                withContext(Dispatchers.Main) {
-                    // Remove "Processing..." message
-                    if (chatContainer.childCount > 0) {
-                        chatContainer.removeViewAt(chatContainer.childCount - 1)
-                    }
+        taskOrchestrator.scheduleTask(
+            TaskRequest(
+                title = "Answer: ${message.take(28)}",
+                type = AriaTaskTypes.CHAT_QUERY,
+                priority = TaskPriority.NORMAL,
+                description = "AI response in progress"
+            )
+        ) {
+            updateProgress(15, "Contacting AI provider")
+            val response = lettaService.sendMessage(message)
+            updateProgress(70, "Response received")
 
-                    val parsedAssistant = VoiceCommandParser.parseAssistantJson(response.text)
-                    if (parsedAssistant != null) {
-                        handleParsedAutomation(parsedAssistant)
-                    } else {
-                        // Add assistant response
-                        addAssistantMessage(response.text)
-
-                        // Speak response with selected provider
-                        enqueueSpeech(response.text)
-                    }
-
-                    // Safety rule: ignore legacy raw root command payloads
-                    response.rootCommand?.takeIf { it.isNotBlank() }?.let { legacy ->
-                        addSystemMessage("⛔ Raw root command ignored by Safe Automation policy")
-                        AutomationAuditLogger.log(this@AssistantActivity, "root_command_ignored:${legacy.take(120)}")
-                    }
+            withContext(Dispatchers.Main) {
+                if (chatContainer.childCount > 0) {
+                    chatContainer.removeViewAt(chatContainer.childCount - 1)
                 }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    // Remove "Processing..." message
-                    if (chatContainer.childCount > 0) {
-                        chatContainer.removeViewAt(chatContainer.childCount - 1)
-                    }
-                    addAssistantMessage("Error: ${e.message}")
+
+                val parsedAssistant = VoiceCommandParser.parseAssistantJson(response.text)
+                if (parsedAssistant != null) {
+                    handleParsedAutomation(parsedAssistant)
+                } else {
+                    addAssistantMessage(response.text)
+                    enqueueSpeech(response.text)
+                }
+
+                response.rootCommand?.takeIf { it.isNotBlank() }?.let { legacy ->
+                    addSystemMessage("⛔ Raw root command ignored by Safe Automation policy")
+                    AutomationAuditLogger.log(this@AssistantActivity, "root_command_ignored:${legacy.take(120)}")
                 }
             }
+            updateProgress(100, "Delivered")
         }
     }
 
@@ -443,14 +449,25 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun executeSafeIntent(envelope: SafeIntentEnvelope) {
-        CoroutineScope(Dispatchers.IO).launch {
+        taskOrchestrator.scheduleTask(
+            TaskRequest(
+                title = "Automation request",
+                type = AriaTaskTypes.AUTOMATION,
+                priority = TaskPriority.HIGH,
+                description = "Executing safe automation"
+            )
+        ) {
+            updateProgress(20, "Validating policy")
             val result = VoiceCommandParser.executeAutomation(this@AssistantActivity, envelope)
+            updateProgress(85, "Publishing result")
+
             withContext(Dispatchers.Main) {
                 addSystemMessage(result.summary)
                 if (result.details.isNotEmpty()) {
                     addSystemMessage(result.details.joinToString(" | "))
                 }
             }
+            updateProgress(100, "Done")
         }
     }
 

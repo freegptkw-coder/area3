@@ -26,6 +26,7 @@ class VoiceTurnStateMachine(
         return when (state) {
             VoiceSessionState.IDLE -> when (event) {
                 VoiceSessionEvent.SessionStarted -> VoiceSessionState.LISTENING
+                is VoiceSessionEvent.TaskScheduled -> VoiceSessionState.MULTI_TASK_ACTIVE
                 is VoiceSessionEvent.BackendFailure -> VoiceSessionState.ERROR_RECOVERY
                 else -> state
             }
@@ -33,6 +34,9 @@ class VoiceTurnStateMachine(
             VoiceSessionState.LISTENING -> when (event) {
                 VoiceSessionEvent.UserSpeechDetected -> VoiceSessionState.PARTIAL_TRANSCRIPTION
                 VoiceSessionEvent.LlmRequestStarted -> VoiceSessionState.THINKING
+                is VoiceSessionEvent.TaskScheduled,
+                is VoiceSessionEvent.TaskProgressUpdate -> VoiceSessionState.MULTI_TASK_ACTIVE
+                is VoiceSessionEvent.TaskCompleted -> VoiceSessionState.TASK_COMPLETED
                 is VoiceSessionEvent.ConfirmationRequested -> VoiceSessionState.AWAITING_CONFIRMATION
                 is VoiceSessionEvent.ActionExecutionStarted -> VoiceSessionState.EXECUTING_ACTION
                 is VoiceSessionEvent.BackendFailure -> VoiceSessionState.ERROR_RECOVERY
@@ -45,6 +49,9 @@ class VoiceTurnStateMachine(
                 VoiceSessionEvent.LlmRequestStarted -> VoiceSessionState.THINKING
 
                 is VoiceSessionEvent.ConfirmationRequested -> VoiceSessionState.AWAITING_CONFIRMATION
+                is VoiceSessionEvent.TaskScheduled,
+                is VoiceSessionEvent.TaskProgressUpdate -> VoiceSessionState.MULTI_TASK_ACTIVE
+                is VoiceSessionEvent.TaskCompleted -> VoiceSessionState.TASK_COMPLETED
                 is VoiceSessionEvent.BackendFailure -> VoiceSessionState.ERROR_RECOVERY
                 else -> state
             }
@@ -55,6 +62,9 @@ class VoiceTurnStateMachine(
                 is VoiceSessionEvent.AssistantAudioChunk -> VoiceSessionState.SPEAKING
 
                 is VoiceSessionEvent.ActionExecutionStarted -> VoiceSessionState.EXECUTING_ACTION
+                is VoiceSessionEvent.TaskScheduled,
+                is VoiceSessionEvent.TaskProgressUpdate -> VoiceSessionState.MULTI_TASK_ACTIVE
+                is VoiceSessionEvent.TaskCompleted -> VoiceSessionState.TASK_COMPLETED
                 is VoiceSessionEvent.ConfirmationRequested -> VoiceSessionState.AWAITING_CONFIRMATION
                 is VoiceSessionEvent.BackendFailure -> VoiceSessionState.ERROR_RECOVERY
                 else -> state
@@ -63,6 +73,9 @@ class VoiceTurnStateMachine(
             VoiceSessionState.SPEAKING -> when (event) {
                 is VoiceSessionEvent.UserInterruptedAssistant -> VoiceSessionState.INTERRUPTED
                 VoiceSessionEvent.AssistantAudioFinished -> VoiceSessionState.LISTENING
+                is VoiceSessionEvent.TaskScheduled,
+                is VoiceSessionEvent.TaskProgressUpdate -> VoiceSessionState.MULTI_TASK_ACTIVE
+                is VoiceSessionEvent.TaskCompleted -> VoiceSessionState.TASK_COMPLETED
                 is VoiceSessionEvent.ActionExecutionStarted -> VoiceSessionState.EXECUTING_ACTION
                 is VoiceSessionEvent.ConfirmationRequested -> VoiceSessionState.AWAITING_CONFIRMATION
                 is VoiceSessionEvent.BackendFailure -> VoiceSessionState.ERROR_RECOVERY
@@ -72,12 +85,18 @@ class VoiceTurnStateMachine(
             VoiceSessionState.INTERRUPTED -> when (event) {
                 VoiceSessionEvent.UserSpeechDetected -> VoiceSessionState.PARTIAL_TRANSCRIPTION
                 VoiceSessionEvent.AssistantAudioFinished -> VoiceSessionState.LISTENING
+                is VoiceSessionEvent.TaskScheduled,
+                is VoiceSessionEvent.TaskProgressUpdate -> VoiceSessionState.MULTI_TASK_ACTIVE
+                is VoiceSessionEvent.TaskCompleted -> VoiceSessionState.TASK_COMPLETED
                 is VoiceSessionEvent.BackendFailure -> VoiceSessionState.ERROR_RECOVERY
                 else -> state
             }
 
             VoiceSessionState.EXECUTING_ACTION -> when (event) {
                 is VoiceSessionEvent.ActionExecutionFinished -> VoiceSessionState.LISTENING
+                is VoiceSessionEvent.TaskScheduled,
+                is VoiceSessionEvent.TaskProgressUpdate -> VoiceSessionState.MULTI_TASK_ACTIVE
+                is VoiceSessionEvent.TaskCompleted -> VoiceSessionState.TASK_COMPLETED
                 is VoiceSessionEvent.BackendFailure -> VoiceSessionState.ERROR_RECOVERY
                 else -> state
             }
@@ -86,6 +105,31 @@ class VoiceTurnStateMachine(
                 is VoiceSessionEvent.ConfirmationResolved -> {
                     if (event.confirmed) VoiceSessionState.EXECUTING_ACTION else VoiceSessionState.LISTENING
                 }
+
+                is VoiceSessionEvent.BackendFailure -> VoiceSessionState.ERROR_RECOVERY
+                else -> state
+            }
+
+            VoiceSessionState.MULTI_TASK_ACTIVE -> when (event) {
+                is VoiceSessionEvent.TaskProgressUpdate,
+                is VoiceSessionEvent.TaskScheduled -> VoiceSessionState.MULTI_TASK_ACTIVE
+
+                is VoiceSessionEvent.TaskCompleted,
+                is VoiceSessionEvent.TaskCanceled -> VoiceSessionState.TASK_COMPLETED
+
+                VoiceSessionEvent.UserSpeechDetected -> VoiceSessionState.PARTIAL_TRANSCRIPTION
+                is VoiceSessionEvent.BackendFailure -> VoiceSessionState.ERROR_RECOVERY
+                else -> state
+            }
+
+            VoiceSessionState.TASK_COMPLETED -> when (event) {
+                VoiceSessionEvent.UserSpeechDetected,
+                VoiceSessionEvent.SessionStarted,
+                VoiceSessionEvent.AssistantAudioFinished,
+                VoiceSessionEvent.RecoveryCompleted -> VoiceSessionState.LISTENING
+
+                is VoiceSessionEvent.TaskScheduled,
+                is VoiceSessionEvent.TaskProgressUpdate -> VoiceSessionState.MULTI_TASK_ACTIVE
 
                 is VoiceSessionEvent.BackendFailure -> VoiceSessionState.ERROR_RECOVERY
                 else -> state

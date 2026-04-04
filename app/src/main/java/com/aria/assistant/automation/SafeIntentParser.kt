@@ -80,12 +80,42 @@ object SafeIntentParser {
             )
         }
 
+        if (looksLikeSendSms(text)) {
+            val contact = extractAfterToken(text, listOf("to", "ke", "for"))
+            val body = extractAfterToken(text, listOf("message", "bolo", "likho", "text"))
+            tasks += SafeTask(
+                type = SafeTaskTypes.SEND_SMS,
+                contact = contact.ifBlank { "" },
+                message = body.ifBlank { "" },
+                riskLevel = "high",
+                requireConfirmation = true
+            )
+        }
+
+        if (looksLikeSocialPost(text)) {
+            val platform = when {
+                text.contains("instagram") || text.contains("insta") -> "instagram"
+                text.contains("facebook") || text.contains("fb") -> "facebook"
+                else -> ""
+            }
+            val body = extractAfterToken(text, listOf("post", "caption", "likho", "share"))
+            tasks += SafeTask(
+                type = SafeTaskTypes.SOCIAL_POST,
+                platform = platform,
+                content = body.ifBlank { "" },
+                riskLevel = "high",
+                requireConfirmation = true
+            )
+        }
+
         if (tasks.isEmpty()) return null
 
         val ack = buildString {
             append("Thik ache, ami sob control e niye nicchi. ")
             if (apps.isNotEmpty()) append("${apps.joinToString(", ")} open korte request pathacchi. ")
             if (tasks.any { it.type == SafeTaskTypes.READ_INCOMING_SMS }) append("Incoming SMS read mode-o on korchi.")
+            if (tasks.any { it.type == SafeTaskTypes.SEND_SMS }) append("SMS send task detect korechi, execution er age confirmation nibo. ")
+            if (tasks.any { it.type == SafeTaskTypes.SOCIAL_POST }) append("Social post task detect korechi, confirmation lagbe. ")
         }.trim()
 
         val envelope = if (tasks.size == 1 && tasks.first().type == SafeTaskTypes.LAUNCH_MULTIPLE_APPS) {
@@ -183,5 +213,28 @@ object SafeIntentParser {
         val hasCue = cues.any { text.contains(it) }
         val hasAction = listOf("open", "launch", "sms", "call", "message", "post").any { text.contains(it) }
         return hasCue && !hasAction
+    }
+
+    private fun looksLikeSendSms(text: String): Boolean {
+        val containsSms = text.contains("sms") || text.contains("text")
+        val containsAction = listOf("send", "pathao", "patha", "dao").any { text.contains(it) }
+        return containsSms && containsAction
+    }
+
+    private fun looksLikeSocialPost(text: String): Boolean {
+        val hasPlatform = listOf("facebook", "fb", "instagram", "insta").any { text.contains(it) }
+        val hasAction = listOf("post", "share", "caption").any { text.contains(it) }
+        return hasPlatform && hasAction
+    }
+
+    private fun extractAfterToken(text: String, tokens: List<String>): String {
+        val normalized = text.trim()
+        tokens.forEach { token ->
+            val idx = normalized.indexOf("$token ")
+            if (idx >= 0) {
+                return normalized.substring(idx + token.length + 1).trim().take(160)
+            }
+        }
+        return ""
     }
 }

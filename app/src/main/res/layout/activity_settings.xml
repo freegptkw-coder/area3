@@ -267,6 +267,97 @@
                 android:checked="true"/>
         </LinearLayout>
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🎨 Theme Engine"
+            android:textColor="#CDA8FF"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="12dp"/>
+
+        <Spinner
+            android:id="@+id/themeModeSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:background="#2D2D2D"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp"/>
+
+        <Spinner
+            android:id="@+id/themePaletteSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:background="#2D2D2D"
+            android:padding="16dp"
+            android:layout_marginBottom="16dp"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="#2D2D2D"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="🔔 Read notifications aloud"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"/>
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/notificationReadAloudSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="false"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="#2D2D2D"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="💬 Auto read incoming SMS"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"/>
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/smsReadAloudSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="false"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="#2D2D2D"
+            android:padding="16dp"
+            android:layout_marginBottom="16dp">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="📥 Notification listener enabled"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"/>
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/notificationListenerSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="false"/>
+        </LinearLayout>
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

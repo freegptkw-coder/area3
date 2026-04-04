@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/mainRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true"
-    android:background="#101218">
+    android:background="@drawable/bg_main_gradient">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -12,30 +13,71 @@
         android:orientation="vertical"
         android:padding="20dp">
 
-        <TextView
-            android:layout_width="wrap_content"
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="ARIA Control Center"
-            android:textColor="#FFFFFF"
-            android:textSize="24sp"
-            android:textStyle="bold" />
+            app:cardBackgroundColor="#152139"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="0dp"
+            app:strokeColor="#324A75"
+            app:strokeWidth="1dp">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="Complete setup to unlock ARIA"
-            android:textColor="#AAB2C0"
-            android:textSize="14sp" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="18dp">
+
+                <ImageView
+                    android:id="@+id/mascotImage"
+                    android:layout_width="72dp"
+                    android:layout_height="72dp"
+                    android:contentDescription="Mascot"
+                    android:src="@drawable/ic_mascot_avatar_dark" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="14dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/welcomeTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Welcome back ✨"
+                        android:textColor="@android:color/white"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="Voice-first automation cockpit"
+                        android:textColor="#C6D9FF"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <ImageView
+                    android:id="@+id/logoImage"
+                    android:layout_width="46dp"
+                    android:layout_height="46dp"
+                    android:layout_gravity="center_vertical"
+                    android:contentDescription="ARIA logo"
+                    android:src="@drawable/avd_aria_logo_pulse" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            app:cardBackgroundColor="#1B1F2A"
-            app:cardCornerRadius="16dp"
+            android:layout_marginTop="16dp"
+            app:cardBackgroundColor="#172338"
+            app:cardCornerRadius="18dp"
             app:cardElevation="0dp"
-            app:strokeColor="#2B3244"
+            app:strokeColor="#334B76"
             app:strokeWidth="1dp">
 
             <LinearLayout
@@ -47,8 +89,8 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Setup Status"
-                    android:textColor="#FFFFFF"
+                    android:text="Setup Health"
+                    android:textColor="@android:color/white"
                     android:textSize="18sp"
                     android:textStyle="bold" />
 
@@ -58,7 +100,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
                     android:text="0/0 permissions"
-                    android:textColor="#AAB2C0"
+                    android:textColor="#BCD4FF"
                     android:textSize="13sp" />
 
                 <com.google.android.material.progressindicator.LinearProgressIndicator
@@ -66,117 +108,78 @@
                     android:layout_width="match_parent"
                     android:layout_height="8dp"
                     android:layout_marginTop="12dp"
-                    app:indicatorColor="#5E8BFF"
-                    app:trackColor="#2B3244" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+                    app:indicatorColor="#82A2FF"
+                    app:trackColor="#2C3B5D" />
 
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            app:cardBackgroundColor="#1B1F2A"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="0dp"
-            app:strokeColor="#2B3244"
-            app:strokeWidth="1dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <LinearLayout
+                <TextView
+                    android:id="@+id/permissionsChecklistStatus"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                    android:layout_marginTop="10dp"
+                    android:text="Permissions: ❌ Pending"
+                    android:textColor="@android:color/white"
+                    android:textSize="14sp" />
 
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Permissions"
-                        android:textColor="#FFFFFF"
-                        android:textSize="15sp" />
-
-                    <TextView
-                        android:id="@+id/permissionsChecklistStatus"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="❌ Pending"
-                        android:textColor="#FFFFFF"
-                        android:textSize="14sp" />
-                </LinearLayout>
-
-                <LinearLayout
+                <TextView
+                    android:id="@+id/overlayChecklistStatus"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                    android:layout_marginTop="6dp"
+                    android:text="Display Overlay: ❌ Pending"
+                    android:textColor="@android:color/white"
+                    android:textSize="14sp" />
 
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Display Overlay"
-                        android:textColor="#FFFFFF"
-                        android:textSize="15sp" />
-
-                    <TextView
-                        android:id="@+id/overlayChecklistStatus"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="❌ Pending"
-                        android:textColor="#FFFFFF"
-                        android:textSize="14sp" />
-                </LinearLayout>
-
-                <LinearLayout
+                <TextView
+                    android:id="@+id/assistantChecklistStatus"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Default Assistant"
-                        android:textColor="#FFFFFF"
-                        android:textSize="15sp" />
-
-                    <TextView
-                        android:id="@+id/assistantChecklistStatus"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="❌ Pending"
-                        android:textColor="#FFFFFF"
-                        android:textSize="14sp" />
-                </LinearLayout>
+                    android:layout_marginTop="6dp"
+                    android:text="Default Assistant: ❌ Pending"
+                    android:textColor="@android:color/white"
+                    android:textSize="14sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/openSetupButton"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_height="54dp"
+            android:layout_marginTop="18dp"
             android:text="Open Setup"
-            app:cornerRadius="12dp" />
+            app:cornerRadius="14dp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/startAriaButton"
-            style="@style/Widget.MaterialComponents.Button"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="54dp"
             android:layout_marginTop="12dp"
             android:enabled="false"
             android:text="Start ARIA"
-            app:cornerRadius="12dp" />
+            app:backgroundTint="#4D80FF"
+            app:cornerRadius="14dp" />
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/taskManagerButton"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="50dp"
+                android:layout_weight="1"
+                android:text="Task Manager" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/settingsButton"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="50dp"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:text="Theme &amp; Settings" />
+        </LinearLayout>
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

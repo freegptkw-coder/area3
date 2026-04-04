@@ -24,6 +24,11 @@ sealed class VoiceSessionEvent {
     data class ConfirmationRequested(val reason: String) : VoiceSessionEvent()
     data class ConfirmationResolved(val confirmed: Boolean) : VoiceSessionEvent()
 
+    data class TaskScheduled(val taskId: String, val title: String, val priority: String) : VoiceSessionEvent()
+    data class TaskProgressUpdate(val taskId: String, val progressPercent: Int, val status: String) : VoiceSessionEvent()
+    data class TaskCompleted(val taskId: String, val summary: String) : VoiceSessionEvent()
+    data class TaskCanceled(val taskId: String, val reason: String) : VoiceSessionEvent()
+
     data class BackendFailure(val reason: String) : VoiceSessionEvent()
     data class RecoverableWarning(val reason: String) : VoiceSessionEvent()
     object RecoveryCompleted : VoiceSessionEvent()
@@ -46,6 +51,10 @@ sealed class VoiceSessionEvent {
             is ActionExecutionFinished -> "action_execution_finished"
             is ConfirmationRequested -> "confirmation_requested"
             is ConfirmationResolved -> "confirmation_resolved"
+            is TaskScheduled -> "task_scheduled"
+            is TaskProgressUpdate -> "task_progress_update"
+            is TaskCompleted -> "task_completed"
+            is TaskCanceled -> "task_canceled"
             is BackendFailure -> "backend_failure"
             is RecoverableWarning -> "recoverable_warning"
             RecoveryCompleted -> "recovery_completed"

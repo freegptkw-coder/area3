@@ -10,4 +10,6 @@
     <color name="dark_bg">#FF1E1E1E</color>
     <color name="message_user">#FF2196F3</color>
     <color name="message_assistant">#FF4CAF50</color>
+    <color name="launcher_bg">#FFDEE7FF</color>
+    <color name="launcher_fg">#FF365FA8</color>
 </resources>

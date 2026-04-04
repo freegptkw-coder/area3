@@ -92,6 +92,11 @@
             android:name=".live.LiveConsentActivity"
             android:exported="false"
             android:parentActivityName=".SettingsActivity" />
+
+        <activity
+            android:name=".live.LiveTaskManagerActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
         
         <service
             android:name=".ProactiveService"
@@ -103,6 +108,17 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="microphone" />
+
+        <service
+            android:name=".AriaNotificationListenerService"
+            android:enabled="true"
+            android:exported="false"
+            android:label="ARIA Notification Reader"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
 
         <receiver
             android:name=".live.LiveBootReceiver"

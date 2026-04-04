@@ -1,6 +1,7 @@
 package com.aria.assistant.live
 
 import android.Manifest
+import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -20,12 +21,15 @@ import com.aria.assistant.live.core.StreamingSttGateway
 import com.aria.assistant.live.core.VoiceSessionEvent
 import com.aria.assistant.live.core.VoiceSessionState
 import com.aria.assistant.live.core.VoiceTurnStateMachine
+import com.aria.assistant.multitask.AriaTaskRuntime
+import com.aria.assistant.multitask.TaskStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -44,6 +48,63 @@ class LiveModeService : Service() {
 
         @Volatile
         var onProactiveTextEvent: ((String) -> Unit)? = null
+    }
+
+    private fun startTaskEventBridge() {
+        taskEventBridgeJob?.cancel()
+        taskEventBridgeJob = serviceScope.launch {
+            AriaTaskRuntime.orchestrator.taskEvents.collect { snapshot ->
+                when (snapshot.status) {
+                    TaskStatus.QUEUED -> {
+                        voiceStateMachine.onEvent(
+                            VoiceSessionEvent.TaskScheduled(
+                                taskId = snapshot.id,
+                                title = snapshot.title,
+                                priority = snapshot.priority.name
+                            )
+                        )
+                    }
+
+                    TaskStatus.RUNNING,
+                    TaskStatus.PAUSED -> {
+                        voiceStateMachine.onEvent(
+                            VoiceSessionEvent.TaskProgressUpdate(
+                                taskId = snapshot.id,
+                                progressPercent = snapshot.progressPercent,
+                                status = snapshot.status.name.lowercase()
+                            )
+                        )
+                    }
+
+                    TaskStatus.COMPLETED -> {
+                        voiceStateMachine.onEvent(
+                            VoiceSessionEvent.TaskCompleted(
+                                taskId = snapshot.id,
+                                summary = snapshot.description
+                            )
+                        )
+                    }
+
+                    TaskStatus.CANCELED -> {
+                        voiceStateMachine.onEvent(
+                            VoiceSessionEvent.TaskCanceled(
+                                taskId = snapshot.id,
+                                reason = "canceled"
+                            )
+                        )
+                    }
+
+                    TaskStatus.FAILED -> {
+                        voiceStateMachine.onEvent(
+                            VoiceSessionEvent.TaskCanceled(
+                                taskId = snapshot.id,
+                                reason = snapshot.errorMessage ?: "failed"
+                            )
+                        )
+                    }
+                }
+            }
+        }
     }
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -99,6 +160,7 @@ class LiveModeService : Service() {
     private var sttGateway: StreamingSttGateway? = null
     private val sttHealthTracker = SttHealthTracker()
     private var sttRetryJob: Job? = null
+    private var taskEventBridgeJob: Job? = null
     @Volatile
     private var sttAvailabilityStatus: String = "idle"
     @Volatile
@@ -184,7 +246,8 @@ class LiveModeService : Service() {
             }
         }
         LiveNotification.ensureChannel(this)
-        startForeground(LiveNotification.NOTIFICATION_ID, LiveNotification.build(this))
+        startForeground(LiveNotification.NOTIFICATION_ID, LiveNotification.build(this, speaking = false))
+        startTaskEventBridge()
         localTtsSpeaker = LiveLocalTtsSpeaker(this)
         speechOutputArbiter = LiveSpeechOutputArbiter { active, source ->
             handleAssistantAudioState(active, source)
@@ -276,6 +339,8 @@ class LiveModeService : Service() {
         cancelPendingSttRetry("service_destroy")
         wsClient?.close()
         wsClient = null
+        taskEventBridgeJob?.cancel()
+        taskEventBridgeJob = null
         sttGateway?.stop()
         applySttHealthSnapshot(sttHealthTracker.resetAll())
         sttAvailabilityStatus = "stopped"
@@ -899,6 +964,7 @@ class LiveModeService : Service() {
                 bargeInController.markAssistantOutputStarted(now)
                 avatarOverlay?.setSpeaking(true)
                 voiceStateMachine.onEvent(VoiceSessionEvent.AssistantAudioStarted(source))
+                refreshForegroundNotification(speaking = true)
             } else {
                 bargeInController.markAssistantOutputStarted(now)
                 voiceStateMachine.onEvent(VoiceSessionEvent.AssistantAudioChunk(source))
@@ -909,6 +975,14 @@ class LiveModeService : Service() {
             avatarOverlay?.setSpeaking(false)
             bargeInController.markAssistantOutputStopped()
             voiceStateMachine.onEvent(VoiceSessionEvent.AssistantAudioFinished)
+            refreshForegroundNotification(speaking = false)
+        }
+    }
+
+    private fun refreshForegroundNotification(speaking: Boolean) {
+        runCatching {
+            val manager = getSystemService(NotificationManager::class.java)
+            manager?.notify(LiveNotification.NOTIFICATION_ID, LiveNotification.build(this, speaking))
         }
     }
 

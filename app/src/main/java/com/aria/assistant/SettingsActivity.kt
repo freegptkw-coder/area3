@@ -4,13 +4,17 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Bundle
+import android.provider.Settings
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Spinner
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.app.AppCompatDelegate
+import com.aria.assistant.theme.ThemeManager
+import com.aria.assistant.theme.ThemeConfig
+import com.aria.assistant.theme.ThemeMode
+import com.aria.assistant.theme.ThemePalette
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.switchmaterial.SwitchMaterial
 import com.google.android.material.textfield.TextInputEditText
@@ -50,9 +54,14 @@ class SettingsActivity : AppCompatActivity() {
     // Other
     private lateinit var proactiveSwitch: SwitchMaterial
     private lateinit var themeSwitch: SwitchMaterial
+    private lateinit var themeModeSpinner: Spinner
+    private lateinit var themePaletteSpinner: Spinner
     private lateinit var wakeWordSwitch: SwitchMaterial
     private lateinit var banglaModeSwitch: SwitchMaterial
     private lateinit var safeRootSwitch: SwitchMaterial
+    private lateinit var notificationReadAloudSwitch: SwitchMaterial
+    private lateinit var smsReadAloudSwitch: SwitchMaterial
+    private lateinit var notificationListenerSwitch: SwitchMaterial
     private lateinit var liveModeSwitch: SwitchMaterial
     private lateinit var liveAlwaysOnSwitch: SwitchMaterial
     private lateinit var liveVisionSwitch: SwitchMaterial
@@ -110,9 +119,14 @@ class SettingsActivity : AppCompatActivity() {
 
         proactiveSwitch = findViewById(R.id.proactiveSwitch)
         themeSwitch = findViewById(R.id.themeSwitch)
+        themeModeSpinner = findViewById(R.id.themeModeSpinner)
+        themePaletteSpinner = findViewById(R.id.themePaletteSpinner)
         wakeWordSwitch = findViewById(R.id.wakeWordSwitch)
         banglaModeSwitch = findViewById(R.id.banglaModeSwitch)
         safeRootSwitch = findViewById(R.id.safeRootSwitch)
+        notificationReadAloudSwitch = findViewById(R.id.notificationReadAloudSwitch)
+        smsReadAloudSwitch = findViewById(R.id.smsReadAloudSwitch)
+        notificationListenerSwitch = findViewById(R.id.notificationListenerSwitch)
         liveModeSwitch = findViewById(R.id.liveModeSwitch)
         liveAlwaysOnSwitch = findViewById(R.id.liveAlwaysOnSwitch)
         liveVisionSwitch = findViewById(R.id.liveVisionSwitch)
@@ -133,10 +147,18 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         themeSwitch.setOnCheckedChangeListener { _, isChecked ->
-            AppCompatDelegate.setDefaultNightMode(
-                if (isChecked) AppCompatDelegate.MODE_NIGHT_YES
-                else AppCompatDelegate.MODE_NIGHT_NO
-            )
+            val mode = if (isChecked) ThemeMode.DARK else ThemeMode.LIGHT
+            val modeIndex = ThemeManager.modeValues().indexOf(mode).coerceAtLeast(0)
+            themeModeSpinner.setSelection(modeIndex)
+            ThemeManager.applyTheme(mode)
+        }
+
+        notificationListenerSwitch.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                runCatching {
+                    startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                }
+            }
         }
     }
 
@@ -145,6 +167,8 @@ class SettingsActivity : AppCompatActivity() {
         providerSpinner.adapter = spinnerAdapter(providers)
         ttsProviderSpinner.adapter = spinnerAdapter(ttsProviders)
         speechLanguageSpinner.adapter = spinnerAdapter(speechLanguageLabels)
+        themeModeSpinner.adapter = spinnerAdapter(ThemeManager.modeLabels())
+        themePaletteSpinner.adapter = spinnerAdapter(ThemeManager.paletteLabels())
 
         providerSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
@@ -162,6 +186,16 @@ class SettingsActivity : AppCompatActivity() {
             }
 
             override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+
+        themeModeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val mode = ThemeManager.modeValues()[position]
+                ThemeManager.applyTheme(mode)
+                themeSwitch.isChecked = mode == ThemeMode.DARK
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
         }
     }
 
@@ -249,11 +283,22 @@ class SettingsActivity : AppCompatActivity() {
 
         voiceApiKeyInput.setText(SecurePrefs.getDecryptedString(this, "ARIA_PREFS", "voice_api_key_enc", "voice_api_key"))
 
+        val themeConfig = ThemeManager.load(this)
+
         proactiveSwitch.isChecked = prefs.getBoolean("proactive_enabled", true)
-        themeSwitch.isChecked = prefs.getBoolean("dark_mode", true)
+        themeSwitch.isChecked = themeConfig.mode == ThemeMode.DARK
+        ThemeManager.modeValues().indexOf(themeConfig.mode).takeIf { it >= 0 }?.let {
+            themeModeSpinner.setSelection(it)
+        }
+        ThemeManager.paletteValues().indexOf(themeConfig.palette).takeIf { it >= 0 }?.let {
+            themePaletteSpinner.setSelection(it)
+        }
         wakeWordSwitch.isChecked = prefs.getBoolean("wake_word_enabled", false)
         banglaModeSwitch.isChecked = prefs.getBoolean("bangla_mode", true)
         safeRootSwitch.isChecked = prefs.getBoolean("safe_root_guard", true)
+        notificationReadAloudSwitch.isChecked = prefs.getBoolean("notification_read_aloud_enabled", false)
+        smsReadAloudSwitch.isChecked = prefs.getBoolean("auto_read_incoming_sms", false)
+        notificationListenerSwitch.isChecked = prefs.getBoolean("notification_listener_enabled", false)
         liveModeSwitch.isChecked = prefs.getBoolean("live_mode_enabled", false)
         liveAlwaysOnSwitch.isChecked = prefs.getBoolean("live_always_on", false)
         liveVisionSwitch.isChecked = prefs.getBoolean("live_vision_enabled", false)
@@ -349,6 +394,8 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         val speechLang = speechLanguageValues[speechLanguageSpinner.selectedItemPosition]
+        val selectedThemeMode = ThemeManager.modeValues().getOrElse(themeModeSpinner.selectedItemPosition) { ThemeMode.DARK }
+        val selectedThemePalette = ThemeManager.paletteValues().getOrElse(themePaletteSpinner.selectedItemPosition) { ThemePalette.AURORA }
 
         prefs.edit().apply {
             putString("personality", personality)
@@ -374,15 +421,21 @@ class SettingsActivity : AppCompatActivity() {
             remove("last_good_voice_id")
             putString("speech_recognition_lang", speechLang)
             putBoolean("proactive_enabled", proactiveSwitch.isChecked)
-            putBoolean("dark_mode", themeSwitch.isChecked)
+            putBoolean("dark_mode", selectedThemeMode == ThemeMode.DARK)
             putBoolean("wake_word_enabled", wakeWordSwitch.isChecked)
             putBoolean("bangla_mode", banglaModeSwitch.isChecked)
             putBoolean("safe_root_guard", safeRootSwitch.isChecked)
+            putBoolean("notification_read_aloud_enabled", notificationReadAloudSwitch.isChecked)
+            putBoolean("auto_read_incoming_sms", smsReadAloudSwitch.isChecked)
+            putBoolean("notification_listener_enabled", notificationListenerSwitch.isChecked)
             putBoolean("live_mode_enabled", liveModeSwitch.isChecked)
             putBoolean("live_always_on", liveAlwaysOnSwitch.isChecked)
             putBoolean("live_vision_enabled", liveVisionSwitch.isChecked)
             apply()
         }
+
+        ThemeManager.save(this, ThemeConfig(selectedThemeMode, selectedThemePalette))
+        ThemeManager.applyTheme(selectedThemeMode)
 
         if (liveModeSwitch.isChecked) {
             if (liveAlwaysOnSwitch.isChecked) {
