@@ -33,7 +33,7 @@ class SafeAudioRecorder(
     fun start() {
         if (audioRecord != null) return
         audioRecord = AudioRecord(
-            MediaRecorder.AudioSource.VOICE_RECOGNITION,
+            MediaRecorder.AudioSource.VOICE_COMMUNICATION,
             sampleRate,
             channelConfig,
             encoding,

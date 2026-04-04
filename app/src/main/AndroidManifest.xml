@@ -37,6 +37,18 @@
     <!-- Root permissions (device must be rooted) -->
     <uses-permission android:name="android.permission.ACCESS_SUPERUSER" />
 
+    <queries>
+        <package android:name="com.whatsapp" />
+        <package android:name="com.google.android.youtube" />
+        <package android:name="com.android.chrome" />
+        <package android:name="com.facebook.katana" />
+        <package android:name="com.facebook.orca" />
+        <package android:name="com.instagram.android" />
+        <package android:name="org.telegram.messenger" />
+        <package android:name="com.google.android.calculator" />
+        <package android:name="com.google.android.keep" />
+    </queries>
+
     <application
         android:name=".ARIAApplication"
         android:allowBackup="true"

@@ -93,7 +93,9 @@ class VoiceTurnStateMachine(
             }
 
             VoiceSessionState.EXECUTING_ACTION -> when (event) {
-                is VoiceSessionEvent.ActionExecutionFinished -> VoiceSessionState.LISTENING
+                is VoiceSessionEvent.ActionExecutionFinished -> {
+                    if (event.assistantSpeaking) VoiceSessionState.SPEAKING else VoiceSessionState.LISTENING
+                }
                 is VoiceSessionEvent.TaskScheduled,
                 is VoiceSessionEvent.TaskProgressUpdate -> VoiceSessionState.MULTI_TASK_ACTIVE
                 is VoiceSessionEvent.TaskCompleted -> VoiceSessionState.TASK_COMPLETED

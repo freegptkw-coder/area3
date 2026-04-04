@@ -161,7 +161,7 @@ class LiveDialogOrchestrator(
                 result.executed > 0 || result.blocked == 0
             }
 
-            emitEvent(VoiceSessionEvent.ActionExecutionFinished(actionName, success))
+            emitEvent(VoiceSessionEvent.ActionExecutionFinished(actionName, success, speechOutputArbiter.isSpeaking()))
             onAudit("live_orchestrator:automation_done:$actionName:$success")
         }
     }

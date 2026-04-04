@@ -19,7 +19,7 @@ sealed class VoiceSessionEvent {
     data class UserInterruptedAssistant(val reason: String = "barge_in") : VoiceSessionEvent()
 
     data class ActionExecutionStarted(val action: String) : VoiceSessionEvent()
-    data class ActionExecutionFinished(val action: String, val success: Boolean) : VoiceSessionEvent()
+    data class ActionExecutionFinished(val action: String, val success: Boolean, val assistantSpeaking: Boolean) : VoiceSessionEvent()
 
     data class ConfirmationRequested(val reason: String) : VoiceSessionEvent()
     data class ConfirmationResolved(val confirmed: Boolean) : VoiceSessionEvent()
