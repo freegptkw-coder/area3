@@ -2,12 +2,15 @@ package com.aria.assistant.automation
 
 import android.content.Context
 
+import com.aria.assistant.live.core.PersistentLogger
+
 object AutomationAuditLogger {
     private const val PREF = "ARIA_PREFS"
     private const val KEY = "automation_audit_log"
     private const val MAX_LINES = 300
 
     fun log(context: Context, message: String) {
+        PersistentLogger.log(context, "AUTOMATION", message)
         val prefs = context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
         val old = prefs.getString(KEY, "").orEmpty()

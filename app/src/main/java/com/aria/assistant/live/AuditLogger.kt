@@ -2,12 +2,15 @@ package com.aria.assistant.live
 
 import android.content.Context
 
+import com.aria.assistant.live.core.PersistentLogger
+
 object AuditLogger {
     private const val PREF = "ARIA_PREFS"
     private const val KEY_AUDIT = "live_mode_audit"
     private const val MAX_LINES = 300
 
     fun log(context: Context, event: String) {
+        PersistentLogger.log(context, "LIVE_AUDIT", event)
         val prefs = context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
         val current = prefs.getString(KEY_AUDIT, "").orEmpty()

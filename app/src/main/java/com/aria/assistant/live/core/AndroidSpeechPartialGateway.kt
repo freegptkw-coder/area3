@@ -35,6 +35,7 @@ class AndroidSpeechPartialGateway(
 
     private val minRestartGapMs: Long = 750L
     private val maxConsecutiveErrorsBeforeUnavailable: Int = 6
+    private val watchdogTimeoutMs: Long = 6_000L // Reduced from 10s to 6s for faster hang detection
 
     private val restartRunnable = Runnable {
         if (!running) return@Runnable
@@ -45,9 +46,11 @@ class AndroidSpeechPartialGateway(
     override fun start() {
         if (running) return
         running = true
+        com.aria.assistant.live.core.PersistentLogger.log(appContext, "STT", "Gateway start requested")
         mainHandler.post {
             if (!SpeechRecognizer.isRecognitionAvailable(appContext)) {
                 running = false
+                com.aria.assistant.live.core.PersistentLogger.log(appContext, "STT_ERROR", "Recognition unavailable")
                 onEvent(SttTranscriptEvent.Unavailable)
                 return@post
             }
@@ -56,10 +59,12 @@ class AndroidSpeechPartialGateway(
             }
             if (recognizer == null) {
                 running = false
+                com.aria.assistant.live.core.PersistentLogger.log(appContext, "STT_ERROR", "Failed to create recognizer")
                 onEvent(SttTranscriptEvent.Unavailable)
                 return@post
             }
             // We wait for onVoiceActivity(true) from the VAD engine to avoid constant 5s timeout beeps and audio focus drops.
+            com.aria.assistant.live.core.PersistentLogger.log(appContext, "STT", "Gateway started, waiting for VAD trigger")
             onEvent(SttTranscriptEvent.ListeningStopped)
         }
     }
@@ -68,6 +73,7 @@ class AndroidSpeechPartialGateway(
         running = false
         mainHandler.post {
             mainHandler.removeCallbacks(restartRunnable)
+            mainHandler.removeCallbacks(watchdogRunnable)
             restartScheduled = false
             listening = false
             runCatching { recognizer?.stopListening() }
@@ -123,11 +129,16 @@ class AndroidSpeechPartialGateway(
         mainHandler.removeCallbacks(restartRunnable)
         restartScheduled = false
         runCatching {
+            com.aria.assistant.live.core.PersistentLogger.log(appContext, "STT", "Starting listening")
             sr.startListening(intent)
             listening = true
+            lastActivityMs = System.currentTimeMillis()
+            mainHandler.removeCallbacks(watchdogRunnable)
+            mainHandler.postDelayed(watchdogRunnable, 1500L)
             onEvent(SttTranscriptEvent.ListeningStarted)
         }.onFailure {
             listening = false
+            com.aria.assistant.live.core.PersistentLogger.log(appContext, "STT_ERROR", "Start listening failed: ${it.message}")
             onEvent(
                 SttTranscriptEvent.Error(
                     code = Int.MIN_VALUE,
@@ -136,6 +147,30 @@ class AndroidSpeechPartialGateway(
                 )
             )
             scheduleRestart(1200L)
+        }
+    }
+
+    private var lastActivityMs: Long = 0L
+    private val watchdogRunnable = Runnable {
+        if (!listening || !running) return@Runnable
+        val now = System.currentTimeMillis()
+        if (now - lastActivityMs > watchdogTimeoutMs) {
+            // Hung - force recovery
+            com.aria.assistant.live.core.PersistentLogger.log(
+                appContext,
+                "STT_WATCHDOG",
+                "STT hung detected. Forcing recovery. Last activity: ${now - lastActivityMs}ms ago"
+            )
+            onEvent(SttTranscriptEvent.Timeout)
+            listening = false
+            mainHandler.removeCallbacks(this)
+            runCatching { 
+                recognizer?.cancel()
+                recognizer?.stopListening()
+            }
+            scheduleRestart(800L)
+        } else {
+            mainHandler.postDelayed(this.watchdogRunnable, 1500L) // Check more frequently
         }
     }
 
@@ -148,6 +183,7 @@ class AndroidSpeechPartialGateway(
 
     private fun handleError(code: Int) {
         listening = false
+        mainHandler.removeCallbacks(watchdogRunnable)
 
         if (code == SpeechRecognizer.ERROR_NO_MATCH || code == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
             consecutiveErrors = 0
@@ -217,13 +253,16 @@ class AndroidSpeechPartialGateway(
         listening = false
         consecutiveErrors = 0
         lastPartialText = ""
+        mainHandler.removeCallbacks(watchdogRunnable)
         onEvent(SttTranscriptEvent.ListeningStopped)
     }
 
     private val listener = object : RecognitionListener {
         override fun onReadyForSpeech(params: Bundle?) = Unit
 
-        override fun onBeginningOfSpeech() = Unit
+        override fun onBeginningOfSpeech() {
+            lastActivityMs = System.currentTimeMillis()
+        }
 
         override fun onRmsChanged(rmsdB: Float) = Unit
 
@@ -232,6 +271,7 @@ class AndroidSpeechPartialGateway(
         override fun onEndOfSpeech() {
             // Do not set listening to false here. The recognizer is still processing results.
             // It will be set to false in onResults or onError.
+            lastActivityMs = System.currentTimeMillis()
         }
 
         override fun onError(error: Int) {
@@ -242,16 +282,21 @@ class AndroidSpeechPartialGateway(
             listening = false
             val text = extractBestText(results)
             if (!text.isNullOrBlank()) {
+                com.aria.assistant.live.core.PersistentLogger.log(appContext, "STT_FINAL", text.take(100))
                 onEvent(SttTranscriptEvent.Final(text))
+            } else {
+                com.aria.assistant.live.core.PersistentLogger.log(appContext, "STT", "Final result empty")
             }
             onResultsOrFinalized()
         }
 
         override fun onPartialResults(partialResults: Bundle?) {
+            lastActivityMs = System.currentTimeMillis()
             val text = extractBestText(partialResults)?.trim().orEmpty()
             if (text.isBlank()) return
             if (text == lastPartialText) return
             lastPartialText = text
+            com.aria.assistant.live.core.PersistentLogger.log(appContext, "STT_PARTIAL", text.take(60))
             onEvent(SttTranscriptEvent.Partial(text))
         }
 

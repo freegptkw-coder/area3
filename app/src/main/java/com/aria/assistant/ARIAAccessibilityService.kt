@@ -6,6 +6,7 @@ import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.os.Build
+import com.aria.assistant.live.core.PersistentLogger
 
 class ARIAAccessibilityService : AccessibilityService() {
     
@@ -53,61 +54,151 @@ class ARIAAccessibilityService : AccessibilityService() {
     // ARIA Control Functions
     
     fun clickButton(text: String): Boolean {
-        val rootNode = rootInActiveWindow ?: return false
-        val node = findNodeByText(rootNode, text)
+        PersistentLogger.log(this, "A11Y_ACTION", "Click button: $text")
         
-        if (node != null) {
-            node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-            node.recycle()
-            return true
+        for (attempt in 1..3) {
+            val rootNode = rootInActiveWindow
+            if (rootNode == null) {
+                PersistentLogger.log(this, "A11Y_ERROR", "No root node (attempt $attempt)")
+                if (attempt < 3) Thread.sleep(300)
+                continue
+            }
+            
+            val node = findNodeByText(rootNode, text)
+            
+            if (node != null) {
+                var clickableNode = node
+                while (clickableNode != null && !clickableNode.isClickable) {
+                    clickableNode = clickableNode.parent
+                }
+                if (clickableNode != null && clickableNode.isClickable) {
+                    val success = clickableNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                    if (success) {
+                        PersistentLogger.log(this, "A11Y_SUCCESS", "Clicked button: $text")
+                        return true
+                    }
+                }
+            }
+            
+            // Fallback for content description buttons (e.g. WhatsApp send button)
+            val descNode = findNodeByContentDescription(rootNode, text)
+            if (descNode != null) {
+                var clickableNode = descNode
+                while (clickableNode != null && !clickableNode.isClickable) {
+                    clickableNode = clickableNode.parent
+                }
+                if (clickableNode != null && clickableNode.isClickable) {
+                    val success = clickableNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                    if (success) {
+                        PersistentLogger.log(this, "A11Y_SUCCESS", "Clicked button (desc): $text")
+                        return true
+                    }
+                }
+            }
+            
+            if (attempt < 3) {
+                PersistentLogger.log(this, "A11Y_RETRY", "Button not found, retrying: $text (attempt $attempt)")
+                Thread.sleep(500)
+            }
         }
         
+        PersistentLogger.log(this, "A11Y_ERROR", "Click button failed: $text")
         return false
     }
     
     fun inputText(text: String, targetHint: String? = null): Boolean {
-        val rootNode = rootInActiveWindow ?: return false
-        val editText = findEditText(rootNode, targetHint)
+        PersistentLogger.log(this, "A11Y_ACTION", "Input text (length=${text.length}, hint=$targetHint)")
         
-        if (editText != null) {
-            editText.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
-            
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                val arguments = android.os.Bundle()
-                arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
-                editText.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
+        for (attempt in 1..3) {
+            val rootNode = rootInActiveWindow
+            if (rootNode == null) {
+                PersistentLogger.log(this, "A11Y_ERROR", "No root node for input (attempt $attempt)")
+                if (attempt < 3) Thread.sleep(300)
+                continue
             }
             
-            editText.recycle()
-            return true
+            val editText = findEditText(rootNode, targetHint)
+            
+            if (editText != null) {
+                editText.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+                Thread.sleep(100) // Give focus time to settle
+                
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    val arguments = android.os.Bundle()
+                    arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
+                    val success = editText.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
+                    if (success) {
+                        PersistentLogger.log(this, "A11Y_SUCCESS", "Text input successful")
+                        return true
+                    } else {
+                        PersistentLogger.log(this, "A11Y_WARN", "SET_TEXT action returned false")
+                    }
+                } else {
+                    PersistentLogger.log(this, "A11Y_ERROR", "API level too low for SET_TEXT")
+                    return false
+                }
+            } else {
+                PersistentLogger.log(this, "A11Y_WARN", "EditText not found (attempt $attempt)")
+            }
+            
+            if (attempt < 3) Thread.sleep(500)
         }
         
+        PersistentLogger.log(this, "A11Y_ERROR", "Input text failed after retries")
         return false
     }
     
     fun scrollDown(): Boolean {
+        PersistentLogger.log(this, "A11Y_ACTION", "Scroll down")
         val rootNode = rootInActiveWindow ?: return false
-        return rootNode.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
+        val result = rootNode.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
+        PersistentLogger.log(this, "A11Y_RESULT", "Scroll down: $result")
+        return result
     }
     
     fun scrollUp(): Boolean {
+        PersistentLogger.log(this, "A11Y_ACTION", "Scroll up")
         val rootNode = rootInActiveWindow ?: return false
-        return rootNode.performAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD)
+        val result = rootNode.performAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD)
+        PersistentLogger.log(this, "A11Y_RESULT", "Scroll up: $result")
+        return result
     }
     
     fun getCurrentApp(): String? {
         val event = rootInActiveWindow
-        return event?.packageName?.toString()
+        val packageName = event?.packageName?.toString()
+        if (packageName != null) {
+            PersistentLogger.log(this, "A11Y_INFO", "Current app: $packageName")
+        }
+        return packageName
     }
     
     fun readScreen(): String {
+        PersistentLogger.log(this, "A11Y_ACTION", "Read screen")
         val rootNode = rootInActiveWindow ?: return "Cannot read screen"
         val texts = mutableListOf<String>()
         extractTexts(rootNode, texts)
-        rootNode.recycle()
-        return texts.joinToString("\n")
+        val result = texts.joinToString("\n")
+        PersistentLogger.log(this, "A11Y_RESULT", "Screen text count: ${texts.size}")
+        return result
     }
     
+    private fun findNodeByContentDescription(node: AccessibilityNodeInfo, desc: String): AccessibilityNodeInfo? {
+        val nodeDesc = node.contentDescription?.toString()
+        if (nodeDesc != null && nodeDesc.contains(desc, ignoreCase = true)) {
+            return node
+        }
+        
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val result = findNodeByContentDescription(child, desc)
+            if (result != null) {
+                return result
+            }
+        }
+        return null
+    }
+
     private fun findNodeByText(node: AccessibilityNodeInfo, text: String): AccessibilityNodeInfo? {
         if (node.text?.toString()?.contains(text, ignoreCase = true) == true) {
             return node
@@ -123,7 +214,6 @@ class ARIAAccessibilityService : AccessibilityService() {
             if (result != null) {
                 return result
             }
-            child.recycle()
         }
         
         return null
@@ -142,7 +232,6 @@ class ARIAAccessibilityService : AccessibilityService() {
             if (result != null) {
                 return result
             }
-            child.recycle()
         }
         
         return null
@@ -155,7 +244,6 @@ class ARIAAccessibilityService : AccessibilityService() {
         for (i in 0 until node.childCount) {
             val child = node.getChild(i) ?: continue
             extractTexts(child, texts)
-            child.recycle()
         }
     }
 }

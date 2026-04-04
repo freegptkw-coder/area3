@@ -19,6 +19,7 @@ import android.speech.tts.UtteranceProgressListener
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
+import com.aria.assistant.live.core.PersistentLogger
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -155,6 +156,11 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         taskManagerButton.setOnClickListener {
             startActivity(Intent(this, LiveTaskManagerActivity::class.java))
+        }
+        
+        taskManagerButton.setOnLongClickListener {
+            startActivity(Intent(this, com.aria.assistant.live.LogViewerActivity::class.java))
+            true
         }
         
         voiceButton.setOnClickListener {
@@ -323,15 +329,38 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 voiceButton.text = "🎤"
                 partialResultText.visibility = android.view.View.GONE
                 setVoiceStatus("⚠️ Mic error: $reason")
+                PersistentLogger.log(this@AssistantActivity, "STT_ERROR_ACTIVITY", "$reason (code=${event.code})")
                 Toast.makeText(this@AssistantActivity, "Voice error: $reason", Toast.LENGTH_SHORT).show()
                 if (event.code == 9) { // ERROR_INSUFFICIENT_PERMISSIONS
                     checkPermissions()
+                } else if (!event.recoverable) {
+                    // Unrecoverable error - attempt to recreate gateway
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        PersistentLogger.log(this@AssistantActivity, "STT_RECOVERY", "Recreating gateway after unrecoverable error")
+                        sttGateway?.stop()
+                        sttGateway = StreamingSttGateway.createDefault(this@AssistantActivity) { e ->
+                            runOnUiThread { handleLocalSttEvent(e) }
+                        }
+                    }, 1500)
                 }
             }
             SttTranscriptEvent.Timeout -> {
-                // Ignore timeout visually, gateway handles restart if needed
+                PersistentLogger.log(this@AssistantActivity, "STT_TIMEOUT_ACTIVITY", "STT timed out, gateway will auto-retry")
+                setVoiceStatus("⏱️ Listening timeout")
+                // Gateway handles restart, but we can force restart if stuck
+                Handler(Looper.getMainLooper()).postDelayed({
+                    if (isLocalSttListening) {
+                        PersistentLogger.log(this@AssistantActivity, "STT_RECOVERY", "Force restart after timeout")
+                        sttGateway?.stop()
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            sttGateway?.start()
+                            sttGateway?.onVoiceActivity(true)
+                        }, 300)
+                    }
+                }, 2000)
             }
             SttTranscriptEvent.Unavailable -> {
+                PersistentLogger.log(this@AssistantActivity, "STT_UNAVAILABLE_ACTIVITY", "STT unavailable")
                 setVoiceStatus("⚠️ Mic unavailable")
                 Toast.makeText(this@AssistantActivity, "Voice recognition unavailable", Toast.LENGTH_SHORT).show()
             }
@@ -509,6 +538,7 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val ack = parsed.acknowledgement.ifBlank { "Thik ache, safe automation request receive hoyeche." }
         val safeJson = VoiceCommandParser.toJson(parsed.envelope)
 
+        PersistentLogger.log(this, "AUTOMATION_PARSE", "Parsed automation: ${parsed.envelope.action}")
         addAssistantMessage(ack)
         enqueueSpeech(ack)
         addSystemMessage("Safe Intent JSON: $safeJson")
@@ -516,6 +546,7 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val hasExecutableTask = parsed.envelope.action == "launch_multiple_apps" ||
             !parsed.envelope.tasks.isNullOrEmpty()
         if (!hasExecutableTask) {
+            PersistentLogger.log(this, "AUTOMATION_SKIP", "No executable task")
             addSystemMessage("No executable task requested. Staying on standby.")
             return
         }
@@ -523,6 +554,7 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (VoiceCommandParser.requiresConfirmation(parsed.envelope)) {
             pendingConfirmationEnvelope = parsed.envelope
             val confirmPrompt = "Sensitive task detect hoyeche. Bolun 'confirm' to proceed or 'cancel'."
+            PersistentLogger.log(this, "AUTOMATION_CONFIRM", "Awaiting confirmation for sensitive task")
             addSystemMessage(confirmPrompt)
             enqueueSpeech("Sensitive action ache. Confirm bolle age barabo.")
             return
@@ -532,6 +564,7 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun executeSafeIntent(envelope: SafeIntentEnvelope) {
+        PersistentLogger.log(this, "AUTOMATION_EXEC", "Executing automation: ${envelope.action}")
         taskOrchestrator.scheduleTask(
             TaskRequest(
                 title = "Automation request",
@@ -545,6 +578,7 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             updateProgress(85, "Publishing result")
 
             withContext(Dispatchers.Main) {
+                PersistentLogger.log(this@AssistantActivity, "AUTOMATION_RESULT", "Executed=${result.executed}, Blocked=${result.blocked}")
                 addSystemMessage(result.summary)
                 if (result.details.isNotEmpty()) {
                     addSystemMessage(result.details.joinToString(" | "))

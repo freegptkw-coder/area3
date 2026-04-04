@@ -10,6 +10,7 @@ import androidx.core.content.ContextCompat
 import com.aria.assistant.RootCommandExecutor
 import com.aria.assistant.live.core.LiveDialogOrchestrator
 import com.aria.assistant.live.core.LiveEventBus
+import com.aria.assistant.live.core.LiveWatchdog
 import com.aria.assistant.live.core.LiveSpeechOutputArbiter
 import com.aria.assistant.live.core.ProviderStreamingGateway
 import com.aria.assistant.live.core.ResponseStreamCoordinator
@@ -133,6 +134,7 @@ class LiveModeService : Service() {
     private var localTtsSpeaker: LiveLocalTtsSpeaker? = null
     private var speechOutputArbiter: LiveSpeechOutputArbiter? = null
     private var liveDialogOrchestrator: LiveDialogOrchestrator? = null
+    private var liveWatchdog: LiveWatchdog? = null
     private var wsClient: RealtimeWsClient? = null
     private var avatarOverlay: LiveAvatarOverlay? = null
     @Volatile
@@ -292,6 +294,16 @@ class LiveModeService : Service() {
         sttGateway = StreamingSttGateway.createDefault(this) { event ->
             handleSttTranscriptEvent(event)
         }
+        
+        liveWatchdog = LiveWatchdog(
+            context = this,
+            sttGateway = sttGateway!!,
+            emitEvent = { event -> voiceStateMachine.onEvent(event) },
+            onRecover = {
+                applySttHealthSnapshot(sttHealthTracker.resetAll())
+            }
+        )
+        
         publishSttDebugStatus(voiceStateOverride = "idle")
         
         serviceScope.launch {
@@ -369,6 +381,7 @@ class LiveModeService : Service() {
             audioFocusArbiter.abandonFocus()
         }
         liveDialogOrchestrator?.cancelActiveTurn("service_destroy")
+        liveWatchdog?.stop()
         recorder?.stop()
         recorder = null
         ttsPlayer?.stop()
@@ -411,6 +424,8 @@ class LiveModeService : Service() {
         sttLastSuccessAtMs = 0L
         cancelPendingSttRetry("session_start")
         publishSttDebugStatus(voiceStateOverride = voiceStateMachine.currentState.name.lowercase())
+        
+        liveWatchdog?.start()
 
         val focusGranted = audioFocusArbiter.requestSessionFocus()
         if (!focusGranted) {
@@ -734,6 +749,7 @@ class LiveModeService : Service() {
     }
 
     private fun handleSttTranscriptEvent(event: SttTranscriptEvent) {
+        liveWatchdog?.ping()
         when (event) {
             SttTranscriptEvent.ListeningStarted -> {
                 AuditLogger.log(this, "stt_listening_started")

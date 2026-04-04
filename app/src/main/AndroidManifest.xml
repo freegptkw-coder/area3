@@ -47,6 +47,7 @@
         <package android:name="org.telegram.messenger" />
         <package android:name="com.google.android.calculator" />
         <package android:name="com.google.android.keep" />
+        <package android:name="com.canva.editor" />
     </queries>
 
     <application
@@ -109,6 +110,21 @@
             android:name=".live.LiveTaskManagerActivity"
             android:exported="false"
             android:parentActivityName=".MainActivity" />
+
+        <activity
+            android:name=".live.LogViewerActivity"
+            android:exported="false"
+            android:parentActivityName=".live.LiveTaskManagerActivity" />
+        
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
         
         <service
             android:name=".ProactiveService"
