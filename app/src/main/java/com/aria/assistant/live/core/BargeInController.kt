@@ -16,10 +16,16 @@ class BargeInController(
     private var assistantOutputActiveUntilMs: Long = 0L
 
     @Volatile
+    private var assistantOutputStartedAtMs: Long = 0L
+
+    @Volatile
     private var lastInterruptAtMs: Long = 0L
 
-    fun markAssistantOutputStarted(nowMs: Long = System.currentTimeMillis()) {
+    fun markAssistantOutputStarted(nowMs: Long = System.currentTimeMillis(), isNewStart: Boolean = false) {
         assistantOutputActiveUntilMs = nowMs + assistantOutputHoldMs
+        if (isNewStart) {
+            assistantOutputStartedAtMs = nowMs
+        }
     }
 
     fun markAssistantOutputStopped(nowMs: Long = System.currentTimeMillis()) {
@@ -39,6 +45,10 @@ class BargeInController(
                 (currentState.isSpeechOutputState() && (nowMs - assistantOutputActiveUntilMs) <= staleSpeakingToleranceMs)
         if (!assistantLikelyActive) {
             return BargeInDecision(false, "assistant_not_speaking")
+        }
+
+        if (nowMs - assistantOutputStartedAtMs < 1000L) {
+            return BargeInDecision(false, "barge_in_grace_period")
         }
 
         if (nowMs - lastInterruptAtMs < minInterruptIntervalMs) {

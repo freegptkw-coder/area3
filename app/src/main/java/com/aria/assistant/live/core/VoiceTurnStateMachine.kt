@@ -26,6 +26,8 @@ class VoiceTurnStateMachine(
         return when (state) {
             VoiceSessionState.IDLE -> when (event) {
                 VoiceSessionEvent.SessionStarted -> VoiceSessionState.LISTENING
+                is VoiceSessionEvent.AssistantAudioStarted,
+                is VoiceSessionEvent.AssistantAudioChunk -> VoiceSessionState.SPEAKING
                 is VoiceSessionEvent.TaskScheduled -> VoiceSessionState.MULTI_TASK_ACTIVE
                 is VoiceSessionEvent.BackendFailure -> VoiceSessionState.ERROR_RECOVERY
                 else -> state
@@ -34,6 +36,8 @@ class VoiceTurnStateMachine(
             VoiceSessionState.LISTENING -> when (event) {
                 VoiceSessionEvent.UserSpeechDetected -> VoiceSessionState.PARTIAL_TRANSCRIPTION
                 VoiceSessionEvent.LlmRequestStarted -> VoiceSessionState.THINKING
+                is VoiceSessionEvent.AssistantAudioStarted,
+                is VoiceSessionEvent.AssistantAudioChunk -> VoiceSessionState.SPEAKING
                 is VoiceSessionEvent.TaskScheduled,
                 is VoiceSessionEvent.TaskProgressUpdate -> VoiceSessionState.MULTI_TASK_ACTIVE
                 is VoiceSessionEvent.TaskCompleted -> VoiceSessionState.TASK_COMPLETED
@@ -47,6 +51,9 @@ class VoiceTurnStateMachine(
                 VoiceSessionEvent.UserSpeechEnded,
                 is VoiceSessionEvent.SttFinal,
                 VoiceSessionEvent.LlmRequestStarted -> VoiceSessionState.THINKING
+
+                is VoiceSessionEvent.AssistantAudioStarted,
+                is VoiceSessionEvent.AssistantAudioChunk -> VoiceSessionState.SPEAKING
 
                 is VoiceSessionEvent.ConfirmationRequested -> VoiceSessionState.AWAITING_CONFIRMATION
                 is VoiceSessionEvent.TaskScheduled,

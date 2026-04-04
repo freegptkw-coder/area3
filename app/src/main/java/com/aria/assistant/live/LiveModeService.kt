@@ -393,16 +393,6 @@ class LiveModeService : Service() {
             voiceStateMachine.onEvent(VoiceSessionEvent.RecoverableWarning("audio_focus_initial_request_failed"))
         }
 
-        recorder = SafeAudioRecorder().also { it.start() }
-        ttsPlayer = StreamingTtsPlayer().also { it.start() }
-        speechOutputArbiter?.attachStreamingPlayer(ttsPlayer)
-        speechOutputArbiter?.attachLocalSpeaker(localTtsSpeaker)
-
-        if (ConsentStore.isAvatarEnabled(this)) {
-            avatarOverlay = LiveAvatarOverlay(this).also { it.show() }
-            avatarOverlay?.updateMessage("Live session started 🌸")
-        }
-
         val wsUrl = ConsentStore.getWsUrl(this)
         val backendMode = ConsentStore.getLiveBackendMode(this)
         val wsConfigured = wsUrl.isNotBlank()
@@ -418,6 +408,16 @@ class LiveModeService : Service() {
             this,
             "live_config:mode=$backendMode,ws=${if (wsEnabled) "on" else "off"},vision=$visionEnabled,memories=${if (memoriesEnabledForSession) "on" else "off"}"
         )
+
+        recorder = SafeAudioRecorder().also { it.start() }
+        ttsPlayer = StreamingTtsPlayer().also { it.start() }
+        speechOutputArbiter?.attachStreamingPlayer(ttsPlayer)
+        speechOutputArbiter?.attachLocalSpeaker(localTtsSpeaker)
+
+        if (ConsentStore.isAvatarEnabled(this)) {
+            avatarOverlay = LiveAvatarOverlay(this).also { it.show() }
+            avatarOverlay?.updateMessage("Live session started 🌸")
+        }
 
         if (!wsEnabled && !memoriesEnabledForSession) {
             AuditLogger.log(this, "live_provider_only_mode:no_ws_or_memories")
@@ -966,12 +966,12 @@ class LiveModeService : Service() {
             assistantOutputTickAt = now
             if (!assistantAudioActive) {
                 assistantAudioActive = true
-                bargeInController.markAssistantOutputStarted(now)
+                bargeInController.markAssistantOutputStarted(now, isNewStart = true)
                 avatarOverlay?.setSpeaking(true)
                 voiceStateMachine.onEvent(VoiceSessionEvent.AssistantAudioStarted(source))
                 refreshForegroundNotification(speaking = true)
             } else {
-                bargeInController.markAssistantOutputStarted(now)
+                bargeInController.markAssistantOutputStarted(now, isNewStart = false)
                 voiceStateMachine.onEvent(VoiceSessionEvent.AssistantAudioChunk(source))
             }
         } else if (assistantAudioActive) {

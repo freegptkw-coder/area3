@@ -59,6 +59,30 @@ class AndroidSpeechPartialGateway(
                 onEvent(SttTranscriptEvent.Unavailable)
                 return@post
             }
+            // We wait for onVoiceActivity(true) from the VAD engine to avoid constant 5s timeout beeps and audio focus drops.
+            onEvent(SttTranscriptEvent.ListeningStopped)
+        }
+    }
+            if (recognizer == null) {
+                recognizer = createRecognizerOrNull()
+            }
+            if (recognizer == null) {
+                running = false
+                onEvent(SttTranscriptEvent.Unavailable)
+                return@post
+            }
+            // We wait for onVoiceActivity(true) from the VAD engine to avoid 5s timeout beeps.
+            onEvent(SttTranscriptEvent.ListeningStopped)
+        }
+    }
+            if (recognizer == null) {
+                recognizer = createRecognizerOrNull()
+            }
+            if (recognizer == null) {
+                running = false
+                onEvent(SttTranscriptEvent.Unavailable)
+                return@post
+            }
             startListeningInternal()
         }
     }
@@ -147,6 +171,13 @@ class AndroidSpeechPartialGateway(
 
     private fun handleError(code: Int) {
         listening = false
+
+        if (code == SpeechRecognizer.ERROR_NO_MATCH || code == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+            consecutiveErrors = 0
+            onEvent(SttTranscriptEvent.ListeningStopped)
+            return
+        }
+
         consecutiveErrors += 1
 
         val recoverable = when (code) {
@@ -155,12 +186,8 @@ class AndroidSpeechPartialGateway(
             SpeechRecognizer.ERROR_AUDIO,
             SpeechRecognizer.ERROR_SERVER,
             SpeechRecognizer.ERROR_CLIENT,
-            SpeechRecognizer.ERROR_SPEECH_TIMEOUT,
-            SpeechRecognizer.ERROR_NO_MATCH,
             SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> true
-
             SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> false
-
             else -> false
         }
 
@@ -170,15 +197,9 @@ class AndroidSpeechPartialGateway(
             SpeechRecognizer.ERROR_AUDIO -> "audio"
             SpeechRecognizer.ERROR_SERVER -> "server"
             SpeechRecognizer.ERROR_CLIENT -> "client"
-            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "speech_timeout"
-            SpeechRecognizer.ERROR_NO_MATCH -> "no_match"
             SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "recognizer_busy"
             SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "insufficient_permissions"
             else -> "unknown_$code"
-        }
-
-        if (code == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
-            onEvent(SttTranscriptEvent.Timeout)
         }
 
         onEvent(
@@ -210,7 +231,6 @@ class AndroidSpeechPartialGateway(
 
         val retryDelay = when (code) {
             SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> 1800L + (consecutiveErrors * 350L)
-            SpeechRecognizer.ERROR_NO_MATCH -> 1200L + (consecutiveErrors * 250L)
             else -> 900L + (consecutiveErrors * 300L)
         }
         scheduleRestart(retryDelay.coerceAtMost(6000L))
@@ -220,7 +240,7 @@ class AndroidSpeechPartialGateway(
         listening = false
         consecutiveErrors = 0
         lastPartialText = ""
-        scheduleRestart(700L)
+        onEvent(SttTranscriptEvent.ListeningStopped)
     }
 
     private val listener = object : RecognitionListener {
@@ -233,7 +253,8 @@ class AndroidSpeechPartialGateway(
         override fun onBufferReceived(buffer: ByteArray?) = Unit
 
         override fun onEndOfSpeech() {
-            listening = false
+            // Do not set listening to false here. The recognizer is still processing results.
+            // It will be set to false in onResults or onError.
         }
 
         override fun onError(error: Int) {
