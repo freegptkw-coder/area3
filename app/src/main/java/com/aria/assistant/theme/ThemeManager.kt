@@ -19,7 +19,8 @@ enum class ThemePalette {
     SAKURA,
     OCEAN,
     LAVENDER,
-    DYNAMIC
+    MIDNIGHT,
+    SUNSET
 }
 
 data class ThemeConfig(
@@ -76,11 +77,12 @@ object ThemeManager {
     }
 
     fun paletteLabels(): Array<String> = arrayOf(
-        "Aurora Glow",
-        "Sakura Pink",
-        "Ocean Cyan",
-        "Lavender Dream",
-        "Dynamic (Material You)"
+        "🌌 Aurora Glow",
+        "🌸 Sakura Pink",
+        "🌊 Ocean Cyan",
+        "💜 Lavender Dream",
+        "🌙 Midnight Blue",
+        "🌅 Sunset Ember"
     )
 
     fun modeLabels(): Array<String> = arrayOf(
@@ -102,37 +104,32 @@ object ThemeManager {
         ThemePalette.SAKURA,
         ThemePalette.OCEAN,
         ThemePalette.LAVENDER,
-        ThemePalette.DYNAMIC
+        ThemePalette.MIDNIGHT,
+        ThemePalette.SUNSET
     )
 
     fun resolveAccentColor(context: Context): Int {
         val config = load(context)
-        if (config.palette == ThemePalette.DYNAMIC && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            return context.getColor(android.R.color.system_accent1_500)
-        }
         return when (config.palette) {
             ThemePalette.AURORA -> Color.parseColor("#82A2FF")
             ThemePalette.SAKURA -> Color.parseColor("#F58CCB")
             ThemePalette.OCEAN -> Color.parseColor("#5DD6E8")
             ThemePalette.LAVENDER -> Color.parseColor("#B69CFF")
-            ThemePalette.DYNAMIC -> Color.parseColor("#82A2FF")
+            ThemePalette.MIDNIGHT -> Color.parseColor("#6E8FFF")
+            ThemePalette.SUNSET -> Color.parseColor("#FF6B4A")
         }
     }
 
     fun resolveMainGradient(context: Context): IntArray {
         val config = load(context)
-        if (config.palette == ThemePalette.DYNAMIC && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val top = context.getColor(android.R.color.system_neutral1_900)
-            val bottom = context.getColor(android.R.color.system_accent1_900)
-            return intArrayOf(top, bottom)
-        }
 
         return when (config.palette) {
             ThemePalette.AURORA -> intArrayOf(Color.parseColor("#161B2D"), Color.parseColor("#27375F"))
             ThemePalette.SAKURA -> intArrayOf(Color.parseColor("#2C1A2F"), Color.parseColor("#5C2F5D"))
             ThemePalette.OCEAN -> intArrayOf(Color.parseColor("#122831"), Color.parseColor("#1E5066"))
             ThemePalette.LAVENDER -> intArrayOf(Color.parseColor("#201A30"), Color.parseColor("#3E2F5E"))
-            ThemePalette.DYNAMIC -> intArrayOf(Color.parseColor("#161B2D"), Color.parseColor("#27375F"))
+            ThemePalette.MIDNIGHT -> intArrayOf(Color.parseColor("#10152A"), Color.parseColor("#0E1B3F"))
+            ThemePalette.SUNSET -> intArrayOf(Color.parseColor("#1A0A1E"), Color.parseColor("#3D0F2E"))
         }
     }
 
@@ -153,6 +150,6 @@ object ThemeManager {
     }
 
     fun resolveMascotDrawable(context: Context): Int {
-        return if (isDarkMode(context)) R.drawable.ic_mascot_avatar_dark else R.drawable.ic_mascot_avatar_light
+        return if (isDarkMode(context)) R.drawable.ic_mascot_avatar_new else R.drawable.ic_mascot_avatar_light
     }
 }

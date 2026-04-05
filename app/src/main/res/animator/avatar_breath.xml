@@ -1,0 +1,15 @@
+<objectAnimator xmlns:android="http://schemas.android.com/apk/res/android"
+    android:duration="3000"
+    android:repeatCount="infinite"
+    android:repeatMode="reverse"
+    android:interpolator="@android:interpolator/accelerate_decelerate">
+    <propertyValuesHolder android:propertyName="scaleX">
+        <float>0.97</float><float>1.02</float><float>0.97</float>
+    </propertyValuesHolder>
+    <propertyValuesHolder android:propertyName="scaleY">
+        <float>0.97</float><float>1.02</float><float>0.97</float>
+    </propertyValuesHolder>
+    <propertyValuesHolder android:propertyName="translationY">
+        <float>0</float><float>-1.5</float><float>0</float>
+    </propertyValuesHolder>
+</objectAnimator>

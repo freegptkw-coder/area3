@@ -1,0 +1,54 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Outer ring -->
+    <path
+        android:fillColor="#243A63"
+        android:pathData="M54,8A46,46 0,1 1,54 100A46,46 0,1 1,54 8z" />
+    <!-- Inner face -->
+    <path
+        android:fillColor="#A8C8FF"
+        android:pathData="M54,22A36,36 0,1 1,54 86A36,36 0,1 1,54 22z" />
+    <!-- Glass highlight -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.12"
+        android:pathData="M32,28c0,-10 22,-26 22,-26c0,0 -22,28 -22,50c0,22 22,-28 22,-50c0,0 -22,10 -22,26z" />
+    <!-- Left eye -->
+    <path
+        android:fillColor="#1B2841"
+        android:pathData="M38,46a5,5 0,1 1,0.1 0z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.45"
+        android:pathData="M39.8,43.5a1.8,1.8 0,1 1,0 0z" />
+    <!-- Right eye -->
+    <path
+        android:fillColor="#1B2841"
+        android:pathData="M65,46a5,5 0,1 1,0.1 0z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.45"
+        android:pathData="M66.8,43.5a1.8,1.8 0,1 1,0 0z" />
+    <!-- Smile -->
+    <path
+        android:fillColor="#1B2841"
+        android:pathData="M35,63c5.5,8 30.5,8 36,0c1.2,-1.2 2.5,1.2 1.2,2.5c-8,11 -30.5,11 -38.5,2.5c-1.2,-1.2 0,-3.8 1.3,-2.5z" />
+    <!-- Left cheek -->
+    <path
+        android:fillColor="#FF8DA1"
+        android:fillAlpha="0.3"
+        android:pathData="M28,60a7,7 0,1 1,0 0z" />
+    <!-- Right cheek -->
+    <path
+        android:fillColor="#FF8DA1"
+        android:fillAlpha="0.3"
+        android:pathData="M76,60a7,7 0,1 1,0 0z" />
+    <!-- ARIA text -->
+    <path
+        android:fillColor="#1B2841"
+        android:fillAlpha="0.15"
+        android:pathData="M40,78c0,0 4,-3 14,-3s14,3 14,3v3c0,0 -4,-3 -14,-3s-14,3 -14,3z" />
+</vector>

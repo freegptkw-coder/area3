@@ -1,0 +1,55 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+    <group android:name="breathGroup"
+        android:pivotX="48"
+        android:pivotY="52">
+        <!-- Outer ring glow -->
+        <path
+            android:fillColor="#243A63"
+            android:pathData="M48,6A42,42 0,1 1,48 90A42,42 0,1 1,48 6z" />
+        <!-- Inner face -->
+        <path
+            android:fillColor="#A8C8FF"
+            android:pathData="M48,14A34,34 0,1 1,48 82A34,34 0,1 1,48 14z" />
+        <!-- Glass highlight -->
+        <path
+            android:fillColor="#ffffff"
+            android:fillAlpha="0.15"
+            android:pathData="M30,25c0,-8 18,-20 18,-20c0,0 -18,22 -18,38c0,16 18,-22 18,-38c0,0 -18,8 -18,20z" />
+        <!-- Left eye -->
+        <path
+            android:fillColor="#1B2841"
+            android:pathData="M34,44a4,4 0,1 1,0.1 0z" />
+        <!-- Left eye shine -->
+        <path
+            android:fillColor="#ffffff"
+            android:fillAlpha="0.5"
+            android:pathData="M35.5,42a1.5,1.5 0,1 1,0 0z" />
+        <!-- Right eye -->
+        <path
+            android:fillColor="#1B2841"
+            android:pathData="M58,44a4,4 0,1 1,0.1 0z" />
+        <!-- Right eye shine -->
+        <path
+            android:fillColor="#ffffff"
+            android:fillAlpha="0.5"
+            android:pathData="M59.5,42a1.5,1.5 0,1 1,0 0z" />
+        <!-- Smile -->
+        <path
+            android:fillColor="#1B2841"
+            android:pathData="M32,58c5,7 27,7 32,0c1,-1 2,1 1,2c-7,10 -27,10 -34,0c-1,-1 0,-3 1,-2z" />
+        <!-- Cheeks: left -->
+        <path
+            android:fillColor="#FF8DA1"
+            android:fillAlpha="0.35"
+            android:pathData="M26,54a6,6 0,1 1,0 0z" />
+        <!-- Cheeks: right -->
+        <path
+            android:fillColor="#FF8DA1"
+            android:fillAlpha="0.35"
+            android:pathData="M66,54a6,6 0,1 1,0 0z" />
+    </group>
+</vector>

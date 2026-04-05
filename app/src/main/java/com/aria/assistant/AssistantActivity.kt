@@ -34,6 +34,7 @@ import com.aria.assistant.multitask.AriaTaskTypes
 import com.aria.assistant.multitask.TaskPriority
 import com.aria.assistant.multitask.TaskRequest
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -242,7 +243,8 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun handleLiveState(state: VoiceSessionState) {
         when (state) {
             VoiceSessionState.LISTENING -> {
-                voiceButton.text = "🔴"
+                voiceButton.icon = ContextCompat.getDrawable(this, R.drawable.ic_stop_24)
+                voiceButton.iconTint = android.content.res.ColorStateList.valueOf(0xFFFFFFFF.toInt())
                 setVoiceStatus("🎧 Listening...")
             }
             VoiceSessionState.SPEAKING -> {
@@ -252,7 +254,8 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 setVoiceStatus("🧠 Thinking...")
             }
             VoiceSessionState.IDLE -> {
-                voiceButton.text = "🎤"
+                voiceButton.icon = ContextCompat.getDrawable(this, R.drawable.ic_mic_24)
+                voiceButton.iconTint = android.content.res.ColorStateList.valueOf(0xFFFFFFFF.toInt())
                 setVoiceStatus("🔇 Idle")
             }
             else -> {
@@ -274,14 +277,14 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun handleLocalSttEvent(event: SttTranscriptEvent) {
         when (event) {
             SttTranscriptEvent.ListeningStarted -> {
-                voiceButton.text = "🔴"
+                voiceButton.icon = ContextCompat.getDrawable(this, R.drawable.ic_stop_24)
                 setVoiceStatus("🎧 Listening...")
                 partialResultText.text = "Listening to your voice..."
                 partialResultText.visibility = android.view.View.VISIBLE
                 isLocalSttListening = true
             }
             SttTranscriptEvent.ListeningStopped -> {
-                voiceButton.text = "🎤"
+                voiceButton.icon = ContextCompat.getDrawable(this, R.drawable.ic_mic_24)
                 partialResultText.visibility = android.view.View.GONE
                 isLocalSttListening = false
                 if (!ttsReady) setVoiceStatus("🔇 Idle")
@@ -292,7 +295,7 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
             is SttTranscriptEvent.Final -> {
                 val matches = event.text
-                voiceButton.text = "🎤"
+                voiceButton.icon = ContextCompat.getDrawable(this, R.drawable.ic_mic_24)
                 partialResultText.visibility = android.view.View.GONE
                 if (matches.isNotEmpty()) {
                     val prefs = getSharedPreferences("ARIA_PREFS", Context.MODE_PRIVATE)
@@ -326,7 +329,7 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
             is SttTranscriptEvent.Error -> {
                 val reason = event.reason
-                voiceButton.text = "🎤"
+                voiceButton.icon = ContextCompat.getDrawable(this, R.drawable.ic_mic_24)
                 partialResultText.visibility = android.view.View.GONE
                 setVoiceStatus("⚠️ Mic error: $reason")
                 PersistentLogger.log(this@AssistantActivity, "STT_ERROR_ACTIVITY", "$reason (code=${event.code})")
