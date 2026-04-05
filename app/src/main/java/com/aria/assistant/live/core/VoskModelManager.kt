@@ -19,43 +19,35 @@ import java.util.zip.ZipInputStream
  * internal storage filesDir/vosk_models/<langCode>/.
  * 
  * Usage:
- * 1. Call downloadAndExtractModel(context, "bn") { progress -> ... }
+ * 1. Call downloadAndExtractModel(context, "en") { progress -> ... }
  * 2. Progress callback receives 0-100 for download, 100+ for extraction
- * 3. After completion, OfflineSttGateway("bn") can be used
+ * 3. After completion, OfflineSttGateway("en") can be used
  */
 object VoskModelManager {
     private const val TAG = "VoskModelMgr"
     private const val BASE_URL = "https://alphacephei.com/vosk/models"
 
     // Model zip filenames (downloaded from BASE_URL)
+    // NOTE: bn, hi, ar models removed from alphacephei server (404 as of 2026-04)
     val MODELS = mapOf(
-        "bn" to "vosk-model-bn-0.4.zip",
         "en" to "vosk-model-small-en-us-0.15.zip",
-        "hi" to "vosk-model-hi-0.4.zip",
         "es" to "vosk-model-small-es-0.42.zip",
         "fr" to "vosk-model-small-fr-0.22.zip",
-        "ar" to "vosk-model-ar-mgb2-0.4.zip",
         "zh" to "vosk-model-small-cn-0.22.zip"
     )
 
     // Model sizes in MB (approximate, for progress UI)
     val MODEL_SIZES_MB = mapOf(
-        "bn" to 49,
         "en" to 43,
-        "hi" to 45,
         "es" to 36,
         "fr" to 38,
-        "ar" to 52,
         "zh" to 41
     )
 
     val MODEL_LABELS = mapOf(
-        "bn" to "Bangla 🇧🇩 (~49MB)",
         "en" to "English 🇺🇸 (~43MB)",
-        "hi" to "Hindi 🇮🇳 (~45MB)",
         "es" to "Spanish 🇪🇸 (~36MB)",
         "fr" to "French 🇫🇷 (~38MB)",
-        "ar" to "Arabic 🇸🇦 (~52MB)",
         "zh" to "Chinese 🇨🇳 (~41MB)"
     )
 
@@ -126,7 +118,7 @@ object VoskModelManager {
             if (responseCode != 200) {
                 val errorMsg = when (responseCode) {
                     403 -> "Server blocked request (403). Try again later or use different network."
-                    404 -> "Model file not found on server."
+                    404 -> "Model file removed from server. Vosk models bn/hi/ar have been discontinued. Try en/es/fr/zh instead."
                     500 -> "Server error. Try again later."
                     else -> "Server returned HTTP $responseCode"
                 }

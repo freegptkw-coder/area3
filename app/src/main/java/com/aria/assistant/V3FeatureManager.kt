@@ -80,7 +80,7 @@ object V3FeatureManager {
         contextTracking: Boolean,
         offlineStt: Boolean,
         sttLanguage: String,
-        offlineModelLanguage: String = "bn"
+        offlineModelLanguage: String = "en"
     ) {
         prefs.edit().apply {
             putBoolean(KEY_BATTERY_OPTIMIZER, batteryOptimizer)
@@ -111,7 +111,7 @@ object V3FeatureManager {
             KEY_CONTEXT_TRACKING to prefs.getBoolean(KEY_CONTEXT_TRACKING, true),
             KEY_OFFLINE_STT to prefs.getBoolean(KEY_OFFLINE_STT, false),
             KEY_STT_LANGUAGE to (prefs.getString(KEY_STT_LANGUAGE, "en") ?: "en"),
-            KEY_OFFLINE_MODEL_LANG to (prefs.getString(KEY_OFFLINE_MODEL_LANG, "bn") ?: "bn"),
+            KEY_OFFLINE_MODEL_LANG to (prefs.getString(KEY_OFFLINE_MODEL_LANG, "en") ?: "en"),
             KEY_WAKE_WORD to prefs.getBoolean(KEY_WAKE_WORD, false)
         )
     }

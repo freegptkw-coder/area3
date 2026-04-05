@@ -13,15 +13,17 @@ import java.io.File
 
 /**
  * v3.1: Real Offline STT using Vosk library.
- * Supports Bangla, English, Hindi, and 5 more languages.
- * 
+ * Supports English, Spanish, French, and Chinese.
+ * NOTE: bn/hi/ar models discontinued from alphacephei server (2026-04).
+ *
  * Setup:
  * 1. Download Vosk model from https://alphacephei.com/vosk/models
- *    - Bangla: vosk-model-bn-0.4 (~50MB)
- *    - English (small): vosk-model-en-us-daanzu-20200905 (~40MB)
- *    - Hindi: vosk-model-hi-0.4 (~45MB)
+ *    - English (small): vosk-model-small-en-us-0.15 (~43MB)
+ *    - Spanish: vosk-model-small-es-0.42 (~36MB)
+ *    - French: vosk-model-small-fr-0.22 (~38MB)
+ *    - Chinese: vosk-model-small-cn-0.22 (~41MB)
  * 2. Place extracted model in: internal storage / filesDir / vosk_models/<langCode>/
- *    Example: /data/data/com.aria.assistant/files/vosk_models/bn/
+ *    Example: /data/data/com.aria.assistant/files/vosk_models/en/
  * 3. Model files needed: am/final.mdl, conf/model.conf, graph/HCLG.fst, ivector/
  */
 class OfflineSttGateway(
@@ -37,14 +39,11 @@ class OfflineSttGateway(
         private const val BUFFER_SIZE = 4096
         private const val WATCHDOG_MS = 8000L
 
-        // Language code -> model zip filename on alphacephei
+        // Language code -> model path subdirectory (bn/hi/ar discontinued 2026-04)
         val MODEL_MAP = mapOf(
-            "bn" to "bn",
             "en" to "en-us",
-            "hi" to "hi",
             "es" to "es",
             "fr" to "fr",
-            "ar" to "ar",
             "zh" to "cn"
         )
 
@@ -296,16 +295,13 @@ class OfflineSttGateway(
      */
     fun detectLanguage(): String {
         return when (languageCode) {
-            "bn" -> "Bangla"
-            "hi" -> "Hindi"
+            "en" -> "English"
             "es" -> "Spanish"
             "fr" -> "French"
-            "ar" -> "Arabic"
             "zh", "cn" -> "Chinese"
-            else -> "English"
+            else -> "Unknown"
         }
     }
-
     private fun calculateRMS(samples: ShortArray, count: Int): Double {
         var sum = 0.0
         for (i in 0 until count) {

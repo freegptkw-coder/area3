@@ -28,13 +28,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-// v3.0 STT languages
-private val STT_LANGS = arrayOf("English (en)", "Bangla (bn)", "Hindi (hi)", "Spanish (es)", "French (fr)", "Arabic (ar)", "Chinese (zh)")
-private val STT_LANG_VALUES = arrayOf("en", "bn", "hi", "es", "fr", "ar", "zh")
+// v3.0 STT languages (bn/hi/ar discontinued from alphacephei server 2026-04)
+private val STT_LANGS = arrayOf("English (en)", "Spanish (es)", "French (fr)", "Chinese (zh)")
+private val STT_LANG_VALUES = arrayOf("en", "es", "fr", "zh")
 
 // v3.1 Vosk model languages (same codes, with labels)
-private val MODEL_LANGS = arrayOf("🇧🇩 Bangla (bn)", "🇺🇸 English (en)", "🇮🇳 Hindi (hi)", "🇪🇸 Spanish (es)", "🇫🇷 French (fr)", "🇸🇦 Arabic (ar)", "🇨🇳 Chinese (zh)")
-private val MODEL_LANG_VALUES = arrayOf("bn", "en", "hi", "es", "fr", "ar", "zh")
+private val MODEL_LANGS = arrayOf("🇺🇸 English (en)", "🇪🇸 Spanish (es)", "🇫🇷 French (fr)", "🇨🇳 Chinese (zh)")
+private val MODEL_LANG_VALUES = arrayOf("en", "es", "fr", "zh")
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -384,7 +384,7 @@ class SettingsActivity : AppCompatActivity() {
         STT_LANG_VALUES.indexOf(sttLang).takeIf { it >= 0 }?.let { v3SttLanguageSpinner.setSelection(it) }
 
         // v3.1 Model language
-        val modelLang = v3Toggles["v3_offline_model_language"] as? String ?: "bn"
+        val modelLang = v3Toggles["v3_offline_model_language"] as? String ?: "en"
         MODEL_LANG_VALUES.indexOf(modelLang).takeIf { it >= 0 }?.let { v3ModelLangSpinner.setSelection(it) }
 
         refreshModelStorageSync()

@@ -190,12 +190,14 @@ class MainActivity : AppCompatActivity() {
     private fun renderBrainPanel() {
         val prefs = getSharedPreferences("ARIA_PREFS", MODE_PRIVATE)
         val conversationCount = prefs.getInt("conversation_context_count", 0)
-        val modelLang = prefs.getString("v3_offline_model_language", "bn").orEmpty()
+        val modelLang = prefs.getString("v3_offline_model_language", "en").orEmpty()
         val maxTopics = 20
 
         val displayName = when (modelLang) {
-            "bn" -> "Vosk Bangla (bn-0.4)"
-            "en" -> "Vosk English (en-us-0.22)"
+            "en" -> "Vosk English (en-us-0.15)"
+            "es" -> "Vosk Spanish (es-0.42)"
+            "fr" -> "Vosk French (fr-0.22)"
+            "zh" -> "Vosk Chinese (cn-0.22)"
             else -> "Vosk $modelLang"
         }
 
