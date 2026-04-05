@@ -72,12 +72,9 @@ class ProactiveService : Service() {
     }
     
     private fun performChecks() {
-        val personality = prefs.getString("personality", "girlfriend") ?: "girlfriend"
-        if (personality != "girlfriend") return // Only girlfriend mode is proactive
-        
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastCheckTime < 30 * 60 * 1000) return // Max 1 check per 30 min
-        
+
         lastCheckTime = currentTime
         
         val calendar = Calendar.getInstance()
@@ -179,7 +176,8 @@ class ProactiveService : Service() {
             .build()
         
         val notificationManager = getSystemService(NotificationManager::class.java)
-        notificationManager.notify(System.currentTimeMillis().toInt(), notification)
+        val id = (System.currentTimeMillis() % 1000000).toInt() + (System.nanoTime() % 999).toInt()
+        notificationManager.notify((id and 0x7FFFFFFF), notification)
     }
     
     override fun onDestroy() {

@@ -15,7 +15,7 @@ class LiveWatchdog(
 ) {
     private var job: Job? = null
     private var lastActivityMs: Long = System.currentTimeMillis()
-    private val timeoutMs = 12_000L
+    private val timeoutMs = 60_000L // Increased from 12s to 60s — normal pauses can exceed 12s
 
     fun ping() {
         lastActivityMs = System.currentTimeMillis()

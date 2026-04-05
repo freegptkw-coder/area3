@@ -106,7 +106,7 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         settingsButton = findViewById(R.id.settingsButton)
         taskManagerButton = findViewById(R.id.taskManagerButton)
         partialResultText = findViewById(R.id.partialResultText)
-        val voiceStatusText: TextView = findViewById(R.id.voiceStatusText)
+        val voiceStatusText: TextView = findViewById(R.id.voiceStatusText) // Used for voice status display
 
         AppHealthMonitor.consumeLastCrashSummary(this)?.let {
             addSystemMessage("Recovered from previous crash: $it")
@@ -416,12 +416,6 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     override fun onPause() {
         super.onPause()
-        val liveEnabled = getSharedPreferences("ARIA_PREFS", Context.MODE_PRIVATE)
-            .getBoolean("live_mode_enabled", false)
-        val sessionActive = com.aria.assistant.live.ConsentStore.isSessionActive(this)
-        if (liveEnabled && sessionActive) {
-            com.aria.assistant.live.LiveModeController.startService(this)
-        }
     }
 
     override fun onRequestPermissionsResult(

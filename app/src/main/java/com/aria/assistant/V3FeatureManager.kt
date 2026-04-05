@@ -172,7 +172,7 @@ object V3FeatureManager {
         if (!enabled) return null
 
         return try {
-            WakeWordDetector(context, onWakeWord)
+            WakeWordDetector(onWakeWord)
         } catch (e: SecurityException) {
             null
         }

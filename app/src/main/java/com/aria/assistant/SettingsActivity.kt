@@ -23,7 +23,6 @@ import com.aria.assistant.live.ConsentStore
 import com.aria.assistant.live.LiveModeController
 import com.aria.assistant.live.LiveSafetyActivity
 import com.aria.assistant.live.core.VoskModelManager
-import com.aria.assistant.live.core.OfflineSttGateway
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

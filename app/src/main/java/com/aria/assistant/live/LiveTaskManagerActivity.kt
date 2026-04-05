@@ -28,7 +28,6 @@ class LiveTaskManagerActivity : AppCompatActivity() {
     private lateinit var taskCountText: TextView
     private lateinit var emptyText: TextView
     private lateinit var clearDoneButton: MaterialButton
-    private lateinit var viewLogsButton: MaterialButton
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

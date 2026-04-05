@@ -76,13 +76,13 @@ object AdvancedPhoneControl {
     
     suspend fun getVolume(stream: String): String {
         val streamType = when(stream.lowercase()) {
-            "media", "music" -> 3
-            "ring", "ringtone" -> 2
-            "notification" -> 5
-            "alarm" -> 4
-            else -> 3
+            "media", "music" -> "STREAM_MUSIC"
+            "ring", "ringtone" -> "STREAM_RING"
+            "notification" -> "STREAM_NOTIFICATION"
+            "alarm" -> "STREAM_ALARM"
+            else -> "STREAM_MUSIC"
         }
-        return executeRootCommand("media volume --stream $streamType --get")
+        return executeRootCommand("dumpsys audio | grep $streamType -A 3")
     }
     
     // Battery info

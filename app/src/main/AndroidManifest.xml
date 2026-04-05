@@ -171,6 +171,12 @@
         </receiver>
 
         <receiver
+            android:name=".live.GeofenceBroadcastReceiver"
+            android:enabled="true"
+            android:exported="false">
+        </receiver>
+
+        <receiver
             android:name=".widget.AriaWidgetProvider"
             android:exported="true">
             <intent-filter>

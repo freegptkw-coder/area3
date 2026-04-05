@@ -1,6 +1,5 @@
 package com.aria.assistant
 
-import android.animation.ObjectAnimator
 import android.content.Intent
 import android.graphics.drawable.AnimatedVectorDrawable
 import android.graphics.drawable.GradientDrawable
