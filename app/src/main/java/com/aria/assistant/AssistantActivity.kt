@@ -568,6 +568,9 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun executeSafeIntent(envelope: SafeIntentEnvelope) {
         PersistentLogger.log(this, "AUTOMATION_EXEC", "Executing automation: ${envelope.action}")
+        // Bug 3 Fix: Use applicationContext instead of Activity context
+        // so tasks keep running even when Activity goes to background
+        val appContext = applicationContext
         taskOrchestrator.scheduleTask(
             TaskRequest(
                 title = "Automation request",
@@ -577,14 +580,18 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             )
         ) {
             updateProgress(20, "Validating policy")
-            val result = VoiceCommandParser.executeAutomation(this@AssistantActivity, envelope)
+            // Bug 3 Fix: use applicationContext for executor - survives background
+            val result = VoiceCommandParser.executeAutomation(appContext, envelope)
             updateProgress(85, "Publishing result")
 
-            withContext(Dispatchers.Main) {
-                PersistentLogger.log(this@AssistantActivity, "AUTOMATION_RESULT", "Executed=${result.executed}, Blocked=${result.blocked}")
-                addSystemMessage(result.summary)
-                if (result.details.isNotEmpty()) {
-                    addSystemMessage(result.details.joinToString(" | "))
+            // Try UI update if Activity still alive, but don't fail if it's dead
+            runCatching {
+                withContext(Dispatchers.Main) {
+                    PersistentLogger.log(appContext, "AUTOMATION_RESULT", "Executed=${result.executed}, Blocked=${result.blocked}")
+                    addSystemMessage(result.summary)
+                    if (result.details.isNotEmpty()) {
+                        addSystemMessage(result.details.joinToString(" | "))
+                    }
                 }
             }
             updateProgress(100, "Done")

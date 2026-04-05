@@ -89,14 +89,19 @@ object VoskModelManager {
     /**
      * Download and extract a Vosk model.
      * onProgress: 0-99 = download%, 100-200 = extraction%, 200 = done
-     * Returns true on success.
+     * Returns a Result with success status and error message if failed.
      */
+    data class DownloadResult(
+        val success: Boolean,
+        val errorMessage: String? = null
+    )
+
     suspend fun downloadAndExtractModel(
         context: Context,
         langCode: String,
         onProgress: (Int) -> Unit = {}
-    ): Boolean = withContext(Dispatchers.IO) {
-        val zipName = MODELS[langCode] ?: return@withContext false
+    ): DownloadResult = withContext(Dispatchers.IO) {
+        val zipName = MODELS[langCode] ?: return@withContext DownloadResult(false, "Unknown language: $langCode")
         val url = "$BASE_URL/$zipName"
         val modelDir = File(context.filesDir, "${OfflineSttGateway.MODEL_DIR}/$langCode")
 
@@ -109,11 +114,31 @@ object VoskModelManager {
             // Download
             Log.i(TAG, "Downloading $url")
             val connection = URL(url).openConnection() as HttpURLConnection
-            connection.connectTimeout = 60000
-            connection.readTimeout = 120000
+            connection.connectTimeout = 120000
+            connection.readTimeout = 180000
+            // Fix Bug 1: Add User-Agent header to avoid 403 from alphacephei.com
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10) ARIA-Assistant/3.1")
+            connection.setRequestProperty("Accept", "application/zip,*/*")
+            connection.instanceFollowRedirects = true
             connection.connect()
 
+            val responseCode = connection.responseCode
+            if (responseCode != 200) {
+                val errorMsg = when (responseCode) {
+                    403 -> "Server blocked request (403). Try again later or use different network."
+                    404 -> "Model file not found on server."
+                    500 -> "Server error. Try again later."
+                    else -> "Server returned HTTP $responseCode"
+                }
+                Log.e(TAG, "Download failed: HTTP $responseCode for $url")
+                return@withContext DownloadResult(false, errorMsg)
+            }
+
             val totalSize = connection.contentLength.toLong()
+            if (totalSize <= 0) {
+                Log.e(TAG, "Download failed: Unknown content length for $url")
+                return@withContext DownloadResult(false, "Server did not provide file size info")
+            }
             var downloadedBytes = 0L
 
             connection.inputStream.use { input ->
@@ -141,13 +166,14 @@ object VoskModelManager {
             onProgress(200)
             zipFile.delete() // Clean up zip file
             Log.i(TAG, "Model extracted successfully: $langCode")
-            true
+            DownloadResult(success = true)
 
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to download/extract $langCode: ${e.message}")
+            val errorMsg = "Download/extract failed: ${e.message ?: "Unknown error"}"
+            Log.e(TAG, "Failed to download/extract $langCode: ${e.message}", e)
             zipFile.delete()
             modelDir.deleteRecursively()
-            false
+            DownloadResult(success = false, errorMessage = errorMsg)
         }
     }
 

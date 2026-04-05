@@ -650,7 +650,7 @@ class SettingsActivity : AppCompatActivity() {
         v3ModelStatusText.text = "Starting download for: $label"
 
         CoroutineScope(Dispatchers.IO).launch {
-            val success = VoskModelManager.downloadAndExtractModel(
+            val result = VoskModelManager.downloadAndExtractModel(
                 this@SettingsActivity,
                 langCode,
                 onProgress = { progress ->
@@ -680,7 +680,7 @@ class SettingsActivity : AppCompatActivity() {
                 v3DownloadModelButton.text = "📥 Download Model"
                 v3ModelDownloadProgress.visibility = android.view.View.GONE
 
-                if (success) {
+                if (result.success) {
                     Toast.makeText(
                         this@SettingsActivity,
                         "✅ $label downloaded and ready",
@@ -690,7 +690,7 @@ class SettingsActivity : AppCompatActivity() {
                 } else {
                     Toast.makeText(
                         this@SettingsActivity,
-                        "❌ Download failed. Check internet.",
+                        "❌ Download failed: ${result.errorMessage ?: "Check your connection"}",
                         Toast.LENGTH_LONG
                     ).show()
                 }
