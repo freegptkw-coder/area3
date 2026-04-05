@@ -11,6 +11,7 @@ import android.view.ViewGroup
 import android.view.animation.OvershootInterpolator
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.util.Log
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.cardview.widget.CardView
@@ -130,13 +131,22 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyThemeVisuals() {
-        val gradient = ThemeManager.resolveMainGradient(this)
-        rootContainer.background = GradientDrawable(
-            GradientDrawable.Orientation.TOP_BOTTOM,
-            gradient
-        )
+        runCatching {
+            val gradient = ThemeManager.resolveMainGradient(this)
+            rootContainer.background = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                gradient
+            )
+        }.onFailure {
+            Log.e("MainActivity", "applyThemeVisuals failed: ${it.message}")
+        }
 
-        mascotImage.setImageResource(ThemeManager.resolveMascotDrawable(this))
+        runCatching {
+            mascotImage.setImageResource(ThemeManager.resolveMascotDrawable(this))
+        }.onFailure {
+            Log.e("MainActivity", "resolveMascotDrawable failed: ${it.message}")
+            mascotImage.setImageResource(R.drawable.ic_mascot_avatar_new)
+        }
 
         val nickname = getSharedPreferences("ARIA_PREFS", MODE_PRIVATE)
             .getString("nickname", "Commander")

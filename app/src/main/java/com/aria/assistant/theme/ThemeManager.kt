@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.Color
 import android.os.Build
 import androidx.appcompat.app.AppCompatDelegate
-import com.google.android.material.color.DynamicColors
 import com.aria.assistant.R
 
 enum class ThemeMode {
@@ -36,8 +35,8 @@ object ThemeManager {
     fun load(context: Context): ThemeConfig {
         val prefs = context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
         val mode = runCatching {
-            ThemeMode.valueOf(prefs.getString(KEY_THEME_MODE, ThemeMode.DARK.name).orEmpty())
-        }.getOrDefault(ThemeMode.DARK)
+            ThemeMode.valueOf(prefs.getString(KEY_THEME_MODE, ThemeMode.SYSTEM.name).orEmpty())
+        }.getOrDefault(ThemeMode.SYSTEM)
 
         val palette = runCatching {
             ThemePalette.valueOf(prefs.getString(KEY_THEME_PALETTE, ThemePalette.AURORA.name).orEmpty())
