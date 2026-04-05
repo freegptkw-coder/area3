@@ -61,6 +61,10 @@ dependencies {
     implementation 'com.squareup.okhttp3:okhttp-urlconnection:4.12.0'
     implementation 'com.google.code.gson:gson:2.10.1'
 
+    // Vosk offline speech recognition
+    implementation 'com.alphacephei:vosk-android:0.3.32'
+    implementation 'net.java.dev.jna:jna:5.13.0'
+
     // Coroutines for async operations
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3'

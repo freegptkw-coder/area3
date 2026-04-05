@@ -33,6 +33,7 @@ object V3FeatureManager {
     private const val KEY_OFFLINE_STT = "v3_offline_stt"
     private const val KEY_BATTERY_OPT_THRESHOLD = "v3_battery_opt_threshold"
     private const val KEY_STT_LANGUAGE = "v3_stt_language"
+    private const val KEY_OFFLINE_MODEL_LANG = "v3_offline_model_language"
     private const val KEY_WAKE_WORD = "wake_word_enabled"
 
     // === Runtime Permissions ===
@@ -78,7 +79,8 @@ object V3FeatureManager {
         voiceProfile: Boolean,
         contextTracking: Boolean,
         offlineStt: Boolean,
-        sttLanguage: String
+        sttLanguage: String,
+        offlineModelLanguage: String = "bn"
     ) {
         prefs.edit().apply {
             putBoolean(KEY_BATTERY_OPTIMIZER, batteryOptimizer)
@@ -90,6 +92,7 @@ object V3FeatureManager {
             putBoolean(KEY_CONTEXT_TRACKING, contextTracking)
             putBoolean(KEY_OFFLINE_STT, offlineStt)
             putString(KEY_STT_LANGUAGE, sttLanguage)
+            putString(KEY_OFFLINE_MODEL_LANG, offlineModelLanguage)
             apply()
         }
     }
@@ -108,6 +111,7 @@ object V3FeatureManager {
             KEY_CONTEXT_TRACKING to prefs.getBoolean(KEY_CONTEXT_TRACKING, true),
             KEY_OFFLINE_STT to prefs.getBoolean(KEY_OFFLINE_STT, false),
             KEY_STT_LANGUAGE to (prefs.getString(KEY_STT_LANGUAGE, "en") ?: "en"),
+            KEY_OFFLINE_MODEL_LANG to (prefs.getString(KEY_OFFLINE_MODEL_LANG, "bn") ?: "bn"),
             KEY_WAKE_WORD to prefs.getBoolean(KEY_WAKE_WORD, false)
         )
     }

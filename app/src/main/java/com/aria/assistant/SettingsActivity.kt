@@ -9,6 +9,7 @@ import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Spinner
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.aria.assistant.theme.ThemeManager
@@ -21,6 +22,8 @@ import com.google.android.material.textfield.TextInputEditText
 import com.aria.assistant.live.ConsentStore
 import com.aria.assistant.live.LiveModeController
 import com.aria.assistant.live.LiveSafetyActivity
+import com.aria.assistant.live.core.VoskModelManager
+import com.aria.assistant.live.core.OfflineSttGateway
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -29,6 +32,10 @@ import kotlinx.coroutines.withContext
 // v3.0 STT languages
 private val STT_LANGS = arrayOf("English (en)", "Bangla (bn)", "Hindi (hi)", "Spanish (es)", "French (fr)", "Arabic (ar)", "Chinese (zh)")
 private val STT_LANG_VALUES = arrayOf("en", "bn", "hi", "es", "fr", "ar", "zh")
+
+// v3.1 Vosk model languages (same codes, with labels)
+private val MODEL_LANGS = arrayOf("🇧🇩 Bangla (bn)", "🇺🇸 English (en)", "🇮🇳 Hindi (hi)", "🇪🇸 Spanish (es)", "🇫🇷 French (fr)", "🇸🇦 Arabic (ar)", "🇨🇳 Chinese (zh)")
+private val MODEL_LANG_VALUES = arrayOf("bn", "en", "hi", "es", "fr", "ar", "zh")
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -85,6 +92,16 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var v3SttLanguageSpinner: Spinner
     private lateinit var v3RequestPermissionsButton: MaterialButton
     private lateinit var v3DataPrivacyButton: MaterialButton
+
+    // v3.1 Vosk Model Management
+    private lateinit var v3ModelLangSpinner: Spinner
+    private lateinit var v3DownloadModelButton: MaterialButton
+    private lateinit var v3ModelDownloadProgress: android.widget.LinearLayout
+    private lateinit var v3ModelProgressBar: android.widget.ProgressBar
+    private lateinit var v3ModelStatusText: TextView
+    private lateinit var v3ModelStorageInfo: android.widget.LinearLayout
+    private lateinit var v3ModelStorageText: TextView
+    private lateinit var v3DeleteModelButton: MaterialButton
 
     private val personalities = arrayOf(
         "💕 Girlfriend (Sweet & Caring)",
@@ -164,6 +181,16 @@ class SettingsActivity : AppCompatActivity() {
         v3RequestPermissionsButton = findViewById(R.id.v3RequestPermissionsButton)
         v3DataPrivacyButton = findViewById(R.id.v3DataPrivacyButton)
 
+        // v3.1 Vosk Model Management views
+        v3ModelLangSpinner = findViewById(R.id.v3ModelLangSpinner)
+        v3DownloadModelButton = findViewById(R.id.v3DownloadModelButton)
+        v3ModelDownloadProgress = findViewById(R.id.v3ModelDownloadProgress)
+        v3ModelProgressBar = findViewById(R.id.v3ModelProgressBar)
+        v3ModelStatusText = findViewById(R.id.v3ModelStatusText)
+        v3ModelStorageInfo = findViewById(R.id.v3ModelStorageInfo)
+        v3ModelStorageText = findViewById(R.id.v3ModelStorageText)
+        v3DeleteModelButton = findViewById(R.id.v3DeleteModelButton)
+
         setupSpinners()
         loadSettings()
 
@@ -200,6 +227,13 @@ class SettingsActivity : AppCompatActivity() {
         themeModeSpinner.adapter = spinnerAdapter(ThemeManager.modeLabels())
         themePaletteSpinner.adapter = spinnerAdapter(ThemeManager.paletteLabels())
         v3SttLanguageSpinner.adapter = spinnerAdapter(STT_LANGS)
+
+        // v3.1 Vosk model language spinner
+        v3ModelLangSpinner.adapter = spinnerAdapter(MODEL_LANGS)
+
+        v3DownloadModelButton.setOnClickListener { handleModelDownload() }
+        v3DeleteModelButton.setOnClickListener { handleModelDelete() }
+        refreshModelStorageSync() // Update UI based on what's downloaded now
 
         providerSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
@@ -350,6 +384,12 @@ class SettingsActivity : AppCompatActivity() {
         val sttLang = v3Toggles["v3_stt_language"] as? String ?: "en"
         STT_LANG_VALUES.indexOf(sttLang).takeIf { it >= 0 }?.let { v3SttLanguageSpinner.setSelection(it) }
 
+        // v3.1 Model language
+        val modelLang = v3Toggles["v3_offline_model_language"] as? String ?: "bn"
+        MODEL_LANG_VALUES.indexOf(modelLang).takeIf { it >= 0 }?.let { v3ModelLangSpinner.setSelection(it) }
+
+        refreshModelStorageSync()
+
         v3RequestPermissionsButton.setOnClickListener {
             V3FeatureManager.requestV3Permissions(this)
         }
@@ -449,6 +489,7 @@ class SettingsActivity : AppCompatActivity() {
         val selectedThemeMode = ThemeManager.modeValues().getOrElse(themeModeSpinner.selectedItemPosition) { ThemeMode.DARK }
         val selectedThemePalette = ThemeManager.paletteValues().getOrElse(themePaletteSpinner.selectedItemPosition) { ThemePalette.AURORA }
         val v3SttLang = STT_LANG_VALUES[v3SttLanguageSpinner.selectedItemPosition]
+        val v3OfflineModelLang = MODEL_LANG_VALUES[v3ModelLangSpinner.selectedItemPosition]
 
         prefs.edit().apply {
             putString("personality", personality)
@@ -499,7 +540,8 @@ class SettingsActivity : AppCompatActivity() {
             voiceProfile = v3VoiceProfileSwitch.isChecked,
             contextTracking = v3ContextTrackingSwitch.isChecked,
             offlineStt = v3OfflineSttSwitch.isChecked,
-            sttLanguage = v3SttLang
+            sttLanguage = v3SttLang,
+            offlineModelLanguage = v3OfflineModelLang
         )
 
         ThemeManager.save(this, ThemeConfig(selectedThemeMode, selectedThemePalette))
@@ -560,5 +602,117 @@ class SettingsActivity : AppCompatActivity() {
     override fun onSupportNavigateUp(): Boolean {
         finish()
         return true
+    }
+
+    // ============ v3.1 Vosk Model Management ============
+
+    /**
+     * Update the model storage info UI to reflect current state.
+     */
+    private fun refreshModelStorageSync() {
+        val downloaded = VoskModelManager.getDownloadedModels(this)
+        val totalSize = VoskModelManager.getTotalModelSize(this)
+
+        if (downloaded.isEmpty()) {
+            v3ModelStorageInfo.visibility = android.view.View.GONE
+            return
+        }
+
+        v3ModelStorageInfo.visibility = android.view.View.VISIBLE
+        val labels = downloaded.map { lang ->
+            VoskModelManager.MODEL_LABELS[lang] ?: lang
+        }.joinToString(", ")
+        v3ModelStorageText.text = "↓ $labels (${String.format("%.1f", totalSize / 1024.0 / 1024.0)} MB)"
+    }
+
+    /**
+     * Handle download button click: download selected model.
+     */
+    private var isDownloading = false
+
+    private fun handleModelDownload() {
+        if (isDownloading) return
+
+        val pos = v3ModelLangSpinner.selectedItemPosition
+        val langCode = MODEL_LANG_VALUES[pos]
+        val label = MODEL_LANGS[pos]
+
+        if (VoskModelManager.isModelAvailable(this, langCode)) {
+            Toast.makeText(this, "✅ $label already downloaded", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        isDownloading = true
+        v3DownloadModelButton.isEnabled = false
+        v3DownloadModelButton.text = "⏳ Downloading..."
+        v3ModelDownloadProgress.visibility = android.view.View.VISIBLE
+        v3ModelProgressBar.progress = 0
+        v3ModelStatusText.text = "Starting download for: $label"
+
+        CoroutineScope(Dispatchers.IO).launch {
+            val success = VoskModelManager.downloadAndExtractModel(
+                this@SettingsActivity,
+                langCode,
+                onProgress = { progress ->
+                    runOnUiThread {
+                        when {
+                            progress < 100 -> {
+                                v3ModelStatusText.text = "Downloading: $progress%"
+                                v3ModelProgressBar.progress = progress
+                            }
+                            progress < 200 -> {
+                                val extractPct = (progress - 100)
+                                v3ModelStatusText.text = "Extracting: $extractPct%"
+                                v3ModelProgressBar.progress = progress
+                            }
+                            else -> {
+                                v3ModelStatusText.text = "Download complete!"
+                                v3ModelProgressBar.progress = 200
+                            }
+                        }
+                    }
+                }
+            )
+
+            withContext(Dispatchers.Main) {
+                isDownloading = false
+                v3DownloadModelButton.isEnabled = true
+                v3DownloadModelButton.text = "📥 Download Model"
+                v3ModelDownloadProgress.visibility = android.view.View.GONE
+
+                if (success) {
+                    Toast.makeText(
+                        this@SettingsActivity,
+                        "✅ $label downloaded and ready",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    refreshModelStorageSync()
+                } else {
+                    Toast.makeText(
+                        this@SettingsActivity,
+                        "❌ Download failed. Check internet.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+
+    /**
+     * Handle delete button click for selected model.
+     */
+    private fun handleModelDelete() {
+        val pos = v3ModelLangSpinner.selectedItemPosition
+        val langCode = MODEL_LANG_VALUES[pos]
+        val label = MODEL_LANGS[pos]
+
+        if (!VoskModelManager.isModelAvailable(this, langCode)) {
+            Toast.makeText(this, "No model $label found", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        VoskModelManager.deleteModel(this, langCode)
+        Toast.makeText(this, "🗑️ $label deleted", Toast.LENGTH_SHORT).show()
+        refreshModelStorageSync()
     }
 }

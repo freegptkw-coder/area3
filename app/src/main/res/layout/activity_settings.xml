@@ -671,7 +671,7 @@
             android:gravity="center_vertical"
             android:background="#2D2D2D"
             android:padding="16dp"
-            android:layout_marginBottom="12dp">
+            android:layout_marginBottom="8dp">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -684,6 +684,88 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checked="false"/>
+        </LinearLayout>
+
+        <!-- Model language selection -->
+        <TextView
+            android:id="@+id/v3ModelLangLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Model Language"
+            android:textColor="#888888"
+            android:textSize="14sp"
+            android:layout_marginBottom="8dp"
+            android:paddingStart="16dp"/>
+
+        <Spinner
+            android:id="@+id/v3ModelLangSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:background="#2D2D2D"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp"/>
+
+        <!-- Download button + progress -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/v3DownloadModelButton"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="📥 Download Model" />
+
+        <!-- Progress bar + status -->
+        <LinearLayout
+            android:id="@+id/v3ModelDownloadProgress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:background="#1Affffff"
+            android:padding="12dp"
+            android:layout_marginBottom="12dp">
+
+            <ProgressBar
+                android:id="@+id/v3ModelProgressBar"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="200"/>
+
+            <TextView
+                android:id="@+id/v3ModelStatusText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Waiting..."
+                android:textColor="#AAAAAA"
+                android:textSize="12sp"/>
+        </LinearLayout>
+
+        <!-- Storage info -->
+        <LinearLayout
+            android:id="@+id/v3ModelStorageInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="#1Affffff"
+            android:padding="12dp"
+            android:layout_marginBottom="12dp">
+            <TextView
+                android:id="@+id/v3ModelStorageText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="No models downloaded"
+                android:textColor="#888888"
+                android:textSize="12sp"/>
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/v3DeleteModelButton"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🗑️ Delete"
+                android:textColor="#F44336"/>
         </LinearLayout>
 
         <Spinner
