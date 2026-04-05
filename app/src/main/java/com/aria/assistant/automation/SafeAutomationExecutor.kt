@@ -210,7 +210,7 @@ class SafeAutomationExecutor(private val context: Context) {
 
     private suspend fun executeSendMessage(platform: String, contact: String, message: String): Boolean {
         PersistentLogger.log(context, "ACTION_EXEC", "Send message: platform=$platform, contact=$contact")
-        
+
         when (platform.lowercase()) {
             "sms" -> return executeSmsMessage(contact, message)
             "whatsapp" -> return executeWhatsAppMessage(contact, message)
@@ -220,27 +220,15 @@ class SafeAutomationExecutor(private val context: Context) {
             }
         }
     }
-    
-    // Bug 2 Fix: Idempotency guard - dedup window of 30 seconds
-    private val recentSmsHashes = mutableSetOf<Pair<Int, Long>>()
-    private val smsDedupWindowMs = 30_000L
-
-    private fun smsDedupCheck(contact: String, body: String): Boolean {
-        val hash = "${contact}|${body}".hashCode()
-        val now = System.currentTimeMillis()
-        // Remove expired entries
-        recentSmsHashes.retainAll { (_, ts) -> now - ts < smsDedupWindowMs }
-        return !recentSmsHashes.add(hash to now)  // returns true if already seen (duplicate)
-    }
 
     private suspend fun executeSmsMessage(contact: String, body: String): Boolean {
-        // Bug 2 Fix: Idempotency check
-        if (smsDedupCheck(contact, body)) {
+        // Bug 2 Fix: Idempotency check using global guard
+        if (SmsDedupGuard.isDuplicate(contact, body)) {
             PersistentLogger.log(context, "ACTION_DEDUP", "SMS dedup blocked: sending same message to $contact within 30s")
             return true  // Pretend success to avoid re-triggering
         }
 
-        // Try direct SMS API first if permission granted  
+        // Try direct SMS API first if permission granted
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED) {
             try {
                 val smsManager = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {

@@ -54,6 +54,7 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var sendButton: MaterialButton
     private lateinit var settingsButton: MaterialButton
     private lateinit var taskManagerButton: MaterialButton
+    private lateinit var alwaysActiveButton: MaterialButton
     private lateinit var partialResultText: TextView
     
     private var sttGateway: StreamingSttGateway? = null
@@ -64,6 +65,11 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private val speechQueue: ArrayDeque<String> = ArrayDeque()
     private var isSpeakingNow = false
     private var currentSpeakJob: Job? = null
+    // Track automation already handled this session to avoid dual execution
+    // from LLM response re-triggering same tasks
+    private var lastAutomationHash = 0
+    private var lastAutomationTimeMs = 0L
+    private val automationDedupWindowMs = 30_000L
     private val healthHandler = Handler(Looper.getMainLooper())
     private val heartbeatRunnable = object : Runnable {
         override fun run() {
@@ -105,8 +111,29 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         sendButton = findViewById(R.id.sendButton)
         settingsButton = findViewById(R.id.settingsButton)
         taskManagerButton = findViewById(R.id.taskManagerButton)
+        alwaysActiveButton = findViewById(R.id.alwaysActiveButton)
         partialResultText = findViewById(R.id.partialResultText)
         val voiceStatusText: TextView = findViewById(R.id.voiceStatusText) // Used for voice status display
+
+        // Load always-active voice state
+        updateAlwaysActiveButtonState()
+
+        // Always-active voice button click listener
+        alwaysActiveButton.setOnClickListener {
+            val prefs = getSharedPreferences("ARIA_PREFS", Context.MODE_PRIVATE)
+            val currentState = prefs.getBoolean("always_active_voice", false)
+            val newState = !currentState
+            prefs.edit().putBoolean("always_active_voice", newState).apply()
+            updateAlwaysActiveButtonState()
+            if (newState) {
+                addSystemMessage("🎤 Always-active voice enabled! I'll listen automatically after every response.")
+                enqueueSpeech("Always active voice enabled. Bollun Kichu bolle ar ami ready thakbo.")
+                // Restart STT immediately
+                restartSttListening()
+            } else {
+                addSystemMessage("🔇 Always-active voice disabled. Tap mic to listen.")
+            }
+        }
 
         AppHealthMonitor.consumeLastCrashSummary(this)?.let {
             addSystemMessage("Recovered from previous crash: $it")
@@ -216,14 +243,16 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 voiceButton.visibility = android.view.View.VISIBLE
             }
             is VoiceSessionEvent.LlmResponseChunk -> {
+                val cleanText = stripActionJson(event.text)
+                if (cleanText.isBlank()) return // Don't show raw JSON chunks in chat
                 if (currentLiveMessageIndex == -1) {
                     if (chatAdapter.getItemCountCurrent() > 0) {
-                        chatAdapter.removeLastMessage() // Remove any generic processing indicator
+                        chatAdapter.removeLastMessage()
                     }
-                    chatAdapter.addMessage(ChatMessage(text = event.text, sender = ChatMessage.SenderType.ASSISTANT))
+                    chatAdapter.addMessage(ChatMessage(text = cleanText, sender = ChatMessage.SenderType.ASSISTANT))
                     currentLiveMessageIndex = chatAdapter.getItemCountCurrent() - 1
                 } else {
-                    chatAdapter.appendChunkToLastMessage(event.text)
+                    chatAdapter.appendChunkToLastMessage(cleanText)
                     scrollToBottom()
                 }
             }
@@ -470,7 +499,7 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         // Safe local automation parse first (multi-task supported)
         val parsedLocal = VoiceCommandParser.parseAutomation(message)
         if (parsedLocal != null) {
-            handleParsedAutomation(parsedLocal)
+            handleParsedAutomation(parsedLocal, fromLocalParse = true)
             return
         }
         
@@ -492,14 +521,15 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
             val response = lettaService.streamMessage(message, liveShortResponse = false) { chunk ->
                 runOnUiThread {
+                    val cleanChunk = stripActionJson(chunk)
                     if (currentMessageIndex == -1) {
                         if (chatAdapter.getItemCountCurrent() > 0) {
                             chatAdapter.removeLastMessage() // Remove "Processing..."
                         }
-                        chatAdapter.addMessage(ChatMessage(text = chunk, sender = ChatMessage.SenderType.ASSISTANT))
+                        chatAdapter.addMessage(ChatMessage(text = cleanChunk, sender = ChatMessage.SenderType.ASSISTANT))
                         currentMessageIndex = chatAdapter.getItemCountCurrent() - 1
                     } else {
-                        chatAdapter.appendChunkToLastMessage(chunk)
+                        chatAdapter.appendChunkToLastMessage(cleanChunk)
                         scrollToBottom()
                     }
                 }
@@ -508,18 +538,22 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             updateProgress(70, "Response finished")
 
             withContext(Dispatchers.Main) {
+                // Strip action JSON from response text for display/speech
+                val cleanText = stripActionJson(response.text)
+
                 if (currentMessageIndex == -1) {
                     if (chatAdapter.getItemCountCurrent() > 0) {
                         chatAdapter.removeLastMessage() // Remove "Processing..."
                     }
-                    addAssistantMessage(response.text)
+                    addAssistantMessage(cleanText)
                 }
 
+                // Check if LLM returned action JSON (for cases local parse missed it)
                 val parsedAssistant = VoiceCommandParser.parseAssistantJson(response.text)
                 if (parsedAssistant != null) {
                     handleParsedAutomation(parsedAssistant)
                 } else {
-                    enqueueSpeech(response.text)
+                    enqueueSpeech(cleanText)
                 }
 
                 response.rootCommand?.takeIf { it.isNotBlank() }?.let { legacy ->
@@ -531,11 +565,21 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
-    private fun handleParsedAutomation(parsed: ParsedAutomationCommand) {
+    private fun handleParsedAutomation(parsed: ParsedAutomationCommand, fromLocalParse: Boolean = false) {
+        // Dedup check: if same automation was already executed recently, skip
+        val automationHash = parsed.envelope.toString().hashCode()
+        val now = System.currentTimeMillis()
+        if (now - lastAutomationTimeMs < automationDedupWindowMs && automationHash == lastAutomationHash) {
+            PersistentLogger.log(this, "AUTOMATION_DEDUP", "Duplicate automation skipped (hash=$automationHash)")
+            return
+        }
+        lastAutomationHash = automationHash
+        lastAutomationTimeMs = now
+
         val ack = parsed.acknowledgement.ifBlank { "Thik ache, safe automation request receive hoyeche." }
         val safeJson = VoiceCommandParser.toJson(parsed.envelope)
 
-        PersistentLogger.log(this, "AUTOMATION_PARSE", "Parsed automation: ${parsed.envelope.action}")
+        PersistentLogger.log(this, "AUTOMATION_PARSE", "Parsed automation: ${parsed.envelope.action} (fromLocalParse=$fromLocalParse)")
         addAssistantMessage(ack)
         enqueueSpeech(ack)
         addSystemMessage("Safe Intent JSON: $safeJson")
@@ -601,6 +645,40 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val keywords = listOf("cancel", "no", "stop", "na", "bad dao")
         return keywords.any { text == it || text.startsWith("$it ") }
     }
+
+    // Strips action JSON from LLM response so user doesn't see raw JSON in chat/speech
+    // Handles nested braces like {"action":"automation_request","tasks":[{"type":"send_sms"}]}
+    private fun stripActionJson(text: String): String {
+        val marker = "\"action\""
+        val idx = text.indexOf(marker)
+        if (idx < 0) return text
+        // Find the opening brace before the marker
+        val braceStart = text.lastIndexOf('{', idx)
+        if (braceStart < 0) return text
+        // Count braces to find matching close
+        var depth = 0
+        var braceEnd = -1
+        for (i in braceStart until text.length) {
+            when (text[i]) {
+                '{' -> depth++
+                '}' -> {
+                    depth--
+                    if (depth == 0) {
+                        braceEnd = i + 1
+                        break
+                    }
+                }
+            }
+        }
+        if (braceEnd < 0) {
+            // Incomplete JSON (truncated in streaming) — strip from braceStart onward
+            return text.substring(0, braceStart).trimEnd(',', ' ', '\n').trim()
+        }
+        // Remove the JSON block + any trailing comma
+        val before = text.substring(0, braceStart).trimEnd(',', ' ', '\n').trim()
+        val after = text.substring(braceEnd).trimStart(',', ' ', '\n').trim()
+        return if (before.isEmpty()) after else if (after.isEmpty()) before else "$before $after"
+    }
     
     private fun addUserMessage(text: String) {
         chatAdapter.addMessage(ChatMessage(text = text, sender = ChatMessage.SenderType.USER))
@@ -654,15 +732,52 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun onSpeechFinished() {
         isSpeakingNow = false
         setVoiceStatus("🔇 Idle")
-        
+
         runOnUiThread {
             if (speechQueue.isEmpty()) {
                 stopSpeakButton.visibility = android.view.View.GONE
                 voiceButton.visibility = android.view.View.VISIBLE
             }
         }
-        
+
+        // If always-active voice is enabled, restart STT listening automatically
+        if (isAlwaysActiveVoiceEnabled()) {
+            restartSttListening()
+        }
+
         processSpeechQueue()
+    }
+
+    private fun isAlwaysActiveVoiceEnabled(): Boolean {
+        return getSharedPreferences("ARIA_PREFS", Context.MODE_PRIVATE)
+            .getBoolean("always_active_voice", false)
+    }
+
+    private fun updateAlwaysActiveButtonState() {
+        val enabled = isAlwaysActiveVoiceEnabled()
+        if (enabled) {
+            alwaysActiveButton.text = "🎤 Auto ON"
+            alwaysActiveButton.setTextColor(android.content.res.ColorStateList.valueOf(0xFF4CAF50.toInt()))
+            alwaysActiveButton.setStrokeColor(android.content.res.ColorStateList.valueOf(0xFF4CAF50.toInt()))
+        } else {
+            alwaysActiveButton.text = "🎤 Auto"
+            alwaysActiveButton.setTextColor(android.content.res.ColorStateList.valueOf(0x80FFFFFF.toInt()))
+            alwaysActiveButton.setStrokeColor(android.content.res.ColorStateList.valueOf(0x30FFFFFF.toInt()))
+        }
+    }
+
+    private fun restartSttListening() {
+        runCatching {
+            sttGateway?.stop()
+            // Small delay to let STT settle
+            Handler(Looper.getMainLooper()).postDelayed({
+                runCatching {
+                    sttGateway?.start()
+                    sttGateway?.onVoiceActivity(true)
+                    setVoiceStatus("🎤 Listening...")
+                }
+            }, 500)
+        }
     }
 
     private fun setVoiceStatus(status: String) {
