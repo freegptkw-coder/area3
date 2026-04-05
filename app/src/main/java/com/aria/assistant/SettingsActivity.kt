@@ -26,6 +26,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+// v3.0 STT languages
+private val STT_LANGS = arrayOf("English (en)", "Bangla (bn)", "Hindi (hi)", "Spanish (es)", "French (fr)", "Arabic (ar)", "Chinese (zh)")
+private val STT_LANG_VALUES = arrayOf("en", "bn", "hi", "es", "fr", "ar", "zh")
+
 class SettingsActivity : AppCompatActivity() {
 
     private lateinit var prefs: SharedPreferences
@@ -69,6 +73,18 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var rootSafetyCenterButton: MaterialButton
     private lateinit var liveSafetyCenterButton: MaterialButton
     private lateinit var saveButton: MaterialButton
+
+    // v3.0 Feature toggles
+    private lateinit var v3BatteryOptimizerSwitch: SwitchMaterial
+    private lateinit var v3LocationRemindersSwitch: SwitchMaterial
+    private lateinit var v3CallScreeningSwitch: SwitchMaterial
+    private lateinit var v3MusicControlSwitch: SwitchMaterial
+    private lateinit var v3VoiceProfileSwitch: SwitchMaterial
+    private lateinit var v3ContextTrackingSwitch: SwitchMaterial
+    private lateinit var v3OfflineSttSwitch: SwitchMaterial
+    private lateinit var v3SttLanguageSpinner: Spinner
+    private lateinit var v3RequestPermissionsButton: MaterialButton
+    private lateinit var v3DataPrivacyButton: MaterialButton
 
     private val personalities = arrayOf(
         "💕 Girlfriend (Sweet & Caring)",
@@ -136,6 +152,18 @@ class SettingsActivity : AppCompatActivity() {
         liveSafetyCenterButton = findViewById(R.id.liveSafetyCenterButton)
         saveButton = findViewById(R.id.saveButton)
 
+        // v3.0 Feature toggles
+        v3BatteryOptimizerSwitch = findViewById(R.id.v3BatteryOptimizerSwitch)
+        v3LocationRemindersSwitch = findViewById(R.id.v3LocationRemindersSwitch)
+        v3CallScreeningSwitch = findViewById(R.id.v3CallScreeningSwitch)
+        v3MusicControlSwitch = findViewById(R.id.v3MusicControlSwitch)
+        v3VoiceProfileSwitch = findViewById(R.id.v3VoiceProfileSwitch)
+        v3ContextTrackingSwitch = findViewById(R.id.v3ContextTrackingSwitch)
+        v3OfflineSttSwitch = findViewById(R.id.v3OfflineSttSwitch)
+        v3SttLanguageSpinner = findViewById(R.id.v3SttLanguageSpinner)
+        v3RequestPermissionsButton = findViewById(R.id.v3RequestPermissionsButton)
+        v3DataPrivacyButton = findViewById(R.id.v3DataPrivacyButton)
+
         setupSpinners()
         loadSettings()
 
@@ -171,6 +199,7 @@ class SettingsActivity : AppCompatActivity() {
         speechLanguageSpinner.adapter = spinnerAdapter(speechLanguageLabels)
         themeModeSpinner.adapter = spinnerAdapter(ThemeManager.modeLabels())
         themePaletteSpinner.adapter = spinnerAdapter(ThemeManager.paletteLabels())
+        v3SttLanguageSpinner.adapter = spinnerAdapter(STT_LANGS)
 
         providerSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
@@ -309,6 +338,25 @@ class SettingsActivity : AppCompatActivity() {
         val lang = prefs.getString("speech_recognition_lang", "auto") ?: "auto"
         speechLanguageValues.indexOf(lang).takeIf { it >= 0 }?.let { speechLanguageSpinner.setSelection(it) }
 
+        // v3.0 Feature toggles
+        val v3Toggles = V3FeatureManager.loadFeatureToggles(prefs)
+        v3BatteryOptimizerSwitch.isChecked = v3Toggles["v3_battery_optimizer"] as? Boolean ?: true
+        v3LocationRemindersSwitch.isChecked = v3Toggles["v3_location_reminders"] as? Boolean ?: false
+        v3CallScreeningSwitch.isChecked = v3Toggles["v3_call_screening"] as? Boolean ?: false
+        v3MusicControlSwitch.isChecked = v3Toggles["v3_music_control"] as? Boolean ?: false
+        v3VoiceProfileSwitch.isChecked = v3Toggles["v3_voice_profile"] as? Boolean ?: false
+        v3ContextTrackingSwitch.isChecked = v3Toggles["v3_context_tracking"] as? Boolean ?: true
+        v3OfflineSttSwitch.isChecked = v3Toggles["v3_offline_stt"] as? Boolean ?: false
+        val sttLang = v3Toggles["v3_stt_language"] as? String ?: "en"
+        STT_LANG_VALUES.indexOf(sttLang).takeIf { it >= 0 }?.let { v3SttLanguageSpinner.setSelection(it) }
+
+        v3RequestPermissionsButton.setOnClickListener {
+            V3FeatureManager.requestV3Permissions(this)
+        }
+        v3DataPrivacyButton.setOnClickListener {
+            startActivity(Intent(this, DataPrivacyActivity::class.java))
+        }
+
         updateModelSpinner(savedProvider)
         updateVoiceSpinner(savedTtsProvider)
     }
@@ -400,6 +448,7 @@ class SettingsActivity : AppCompatActivity() {
         val speechLang = speechLanguageValues[speechLanguageSpinner.selectedItemPosition]
         val selectedThemeMode = ThemeManager.modeValues().getOrElse(themeModeSpinner.selectedItemPosition) { ThemeMode.DARK }
         val selectedThemePalette = ThemeManager.paletteValues().getOrElse(themePaletteSpinner.selectedItemPosition) { ThemePalette.AURORA }
+        val v3SttLang = STT_LANG_VALUES[v3SttLanguageSpinner.selectedItemPosition]
 
         prefs.edit().apply {
             putString("personality", personality)
@@ -438,6 +487,20 @@ class SettingsActivity : AppCompatActivity() {
             putBoolean("live_vision_enabled", liveVisionSwitch.isChecked)
             apply()
         }
+
+        // v3.0 Feature toggles
+        V3FeatureManager.saveFeatureToggles(
+            prefs,
+            batteryOptimizer = v3BatteryOptimizerSwitch.isChecked,
+            batteryThreshold = 20,
+            locationReminders = v3LocationRemindersSwitch.isChecked,
+            callScreening = v3CallScreeningSwitch.isChecked,
+            musicControl = v3MusicControlSwitch.isChecked,
+            voiceProfile = v3VoiceProfileSwitch.isChecked,
+            contextTracking = v3ContextTrackingSwitch.isChecked,
+            offlineStt = v3OfflineSttSwitch.isChecked,
+            sttLanguage = v3SttLang
+        )
 
         ThemeManager.save(this, ThemeConfig(selectedThemeMode, selectedThemePalette))
         ThemeManager.applyTheme(selectedThemeMode)

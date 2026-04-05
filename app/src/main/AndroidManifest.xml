@@ -122,6 +122,11 @@
             android:name=".live.LogViewerActivity"
             android:exported="false"
             android:parentActivityName=".live.LiveTaskManagerActivity" />
+
+        <activity
+            android:name=".DataPrivacyActivity"
+            android:exported="false"
+            android:parentActivityName=".SettingsActivity" />
         
         <provider
             android:name="androidx.core.content.FileProvider"
