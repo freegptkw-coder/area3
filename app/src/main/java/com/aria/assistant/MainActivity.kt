@@ -326,7 +326,6 @@ class MainActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.IO).launch {
             var successCount = 0
             var failCount = 0
-            val results = mutableListOf<String>()
 
             // 1. Grant all runtime permissions via pm grant
             val perms = listOf(
@@ -347,70 +346,57 @@ class MainActivity : AppCompatActivity() {
             )
 
             for (perm in perms) {
-                val result = execRoot("pm grant $packageName $perm")
-                if (result.contains("Error") || result.isBlank()) {
-                    failCount++
-                    results.add("❌ ${perm.substringAfterLast('.')}")
-                } else {
+                if (execRootAndSucceed("pm grant $packageName $perm")) {
                     successCount++
-                    results.add("✅ ${perm.substringAfterLast('.')}")
+                } else {
+                    failCount++
                 }
             }
 
             // 2. Overlay (SYSTEM_ALERT_WINDOW) via appops
-            val overlayResult = execRoot("appops set $packageName SYSTEM_ALERT_WINDOW allow")
-            if (!overlayResult.contains("Error")) {
+            if (execRootAndSucceed("appops set $packageName SYSTEM_ALERT_WINDOW allow")) {
                 successCount++
-                results.add("✅ Overlay")
             } else {
                 failCount++
-                results.add("❌ Overlay")
             }
 
             // 3. Set as default assistant
             val componentName = "$packageName/com.aria.assistant.AssistantActivity"
-            val assistantResult = execRoot("cmd role add-role-holder android.app.role.ASSISTANT $packageName")
-            if (!assistantResult.contains("Error")) {
+            if (execRootAndSucceed("cmd role add-role-holder android.app.role.ASSISTANT $packageName")) {
                 successCount++
-                results.add("✅ Assistant")
             } else {
                 // Fallback: settings put secure assistant
-                val fallback = execRoot("settings put secure assistant $componentName")
-                if (!fallback.contains("Error")) {
+                if (execRootAndSucceed("settings put secure assistant $componentName")) {
                     successCount++
-                    results.add("✅ Assistant (fallback)")
                 } else {
                     failCount++
-                    results.add("❌ Assistant")
                 }
             }
 
             // 4. Enable Accessibility Service via root
-            val a11yResult = execRoot("settings put secure enabled_accessibility_services $packageName/com.aria.assistant.ARIAAccessibilityService && settings put secure accessibility_enabled 1")
-            if (!a11yResult.contains("Error")) {
+            val a11yOk = execRootAndSucceed("settings put secure enabled_accessibility_services $packageName/com.aria.assistant.ARIAAccessibilityService") &&
+                execRootAndSucceed("settings put secure accessibility_enabled 1")
+            if (a11yOk) {
                 successCount++
-                results.add("✅ Accessibility")
             } else {
                 failCount++
-                results.add("❌ Accessibility")
             }
 
             // 5. Enable Notification Listener via root
-            val notifResult = execRoot("cmd notification allow_listener $packageName/com.aria.assistant.AriaNotificationListenerService")
-            if (!notifResult.contains("Error")) {
+            if (execRootAndSucceed("settings put secure enabled_notification_listeners $packageName/com.aria.assistant.AriaNotificationListenerService")) {
                 successCount++
-                results.add("✅ Notification Listener")
+            } else if (execRootAndSucceed("cmd notification allow_listener $packageName/com.aria.assistant.AriaNotificationListenerService")) {
+                successCount++
             } else {
                 failCount++
-                results.add("❌ Notification Listener")
             }
 
             val finalSuccess = successCount
             val finalFail = failCount
-            val summaryResults = results
 
             withContext(Dispatchers.Main) {
                 rootAutoEnableButton.isEnabled = true
+                rootAutoEnableButton.text = "⚡ Auto-Enable All (Root)"
                 renderSetupState()
                 if (finalFail == 0) {
                     Toast.makeText(this@MainActivity, "✅ All setup complete! $finalSuccess items enabled.", Toast.LENGTH_LONG).show()
@@ -421,15 +407,20 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun execRoot(command: String): String {
+    private fun execRoot(command: String): Pair<Int, String> {
         return try {
             val process = Runtime.getRuntime().exec(arrayOf("su", "-c", command))
             val output = process.inputStream.bufferedReader().readText()
             val error = process.errorStream.bufferedReader().readText()
-            process.waitFor()
-            (output + error).trim()
+            val exitCode = process.waitFor()
+            exitCode to (output + error).trim()
         } catch (e: Exception) {
-            "Error: ${e.message}"
+            -1 to e.message.orEmpty()
         }
+    }
+
+    private fun execRootAndSucceed(command: String): Boolean {
+        val (code, _) = execRoot(command)
+        return code == 0
     }
 }
