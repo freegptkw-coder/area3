@@ -12,6 +12,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.util.Log
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.cardview.widget.CardView
 import androidx.core.content.ContextCompat
@@ -23,6 +24,10 @@ import com.aria.assistant.theme.ThemePalette
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.progressindicator.LinearProgressIndicator
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 class MainActivity : AppCompatActivity() {
@@ -37,6 +42,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var chatActionButton: MaterialButton
     private lateinit var taskManagerButton: MaterialButton
     private lateinit var settingsButton: MaterialButton
+    private lateinit var rootAutoEnableButton: MaterialButton
 
     private lateinit var mascotImage: ImageView
     private lateinit var logoImage: ImageView
@@ -77,6 +83,7 @@ class MainActivity : AppCompatActivity() {
         chatActionButton = findViewById(R.id.chatActionButton)
         taskManagerButton = findViewById(R.id.taskManagerButton)
         settingsButton = findViewById(R.id.settingsButton)
+        rootAutoEnableButton = findViewById(R.id.rootAutoEnableButton)
 
         themeGallery = findViewById(R.id.themeGallery)
 
@@ -107,6 +114,12 @@ class MainActivity : AppCompatActivity() {
         settingsButton.setOnClickListener {
             viewModel.pauseLogoAnimation()
             startActivity(Intent(this, SettingsActivity::class.java))
+        }
+
+        // Root Auto-Enable button
+        rootAutoEnableButton.setOnClickListener {
+            viewModel.pauseLogoAnimation()
+            runRootAutoEnable()
         }
 
         // ── Build theme gallery cards ───────────────────────
@@ -162,6 +175,10 @@ class MainActivity : AppCompatActivity() {
         permissionsStatus.text = buildStatusLine("🔑 Permissions", state.permissionsDone)
         overlayStatus.text = buildStatusLine("🖼️ Display Overlay", state.overlayDone)
         assistantStatus.text = buildStatusLine("📱 Default Assistant", state.assistantDone)
+
+        // Show root auto-enable button only if something is pending
+        val needsSetup = !state.permissionsDone || !state.overlayDone || !state.assistantDone
+        rootAutoEnableButton.visibility = if (needsSetup) View.VISIBLE else View.GONE
     }
 
     private fun buildStatusLine(label: String, done: Boolean): String {
@@ -299,4 +316,120 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun dpToPx(dp: Int): Int = (dp * resources.displayMetrics.density).roundToInt()
+
+    // ── Root Auto-Enable ─────────────────────────────────────
+    private fun runRootAutoEnable() {
+        rootAutoEnableButton.isEnabled = false
+        rootAutoEnableButton.text = "⏳ Enabling..."
+        Toast.makeText(this, "⚡ Auto-enabling with root…", Toast.LENGTH_SHORT).show()
+
+        CoroutineScope(Dispatchers.IO).launch {
+            var successCount = 0
+            var failCount = 0
+            val results = mutableListOf<String>()
+
+            // 1. Grant all runtime permissions via pm grant
+            val perms = listOf(
+                "android.permission.RECORD_AUDIO",
+                "android.permission.READ_CONTACTS",
+                "android.permission.CALL_PHONE",
+                "android.permission.SEND_SMS",
+                "android.permission.READ_SMS",
+                "android.permission.ACCESS_FINE_LOCATION",
+                "android.permission.ACCESS_COARSE_LOCATION",
+                "android.permission.CAMERA",
+                "android.permission.POST_NOTIFICATIONS",
+                "android.permission.BLUETOOTH_CONNECT",
+                "android.permission.BLUETOOTH_SCAN",
+                "android.permission.ACCESS_BACKGROUND_LOCATION",
+                "android.permission.READ_PHONE_STATE",
+                "android.permission.ANSWER_PHONE_CALLS"
+            )
+
+            for (perm in perms) {
+                val result = execRoot("pm grant $packageName $perm")
+                if (result.contains("Error") || result.isBlank()) {
+                    failCount++
+                    results.add("❌ ${perm.substringAfterLast('.')}")
+                } else {
+                    successCount++
+                    results.add("✅ ${perm.substringAfterLast('.')}")
+                }
+            }
+
+            // 2. Overlay (SYSTEM_ALERT_WINDOW) via appops
+            val overlayResult = execRoot("appops set $packageName SYSTEM_ALERT_WINDOW allow")
+            if (!overlayResult.contains("Error")) {
+                successCount++
+                results.add("✅ Overlay")
+            } else {
+                failCount++
+                results.add("❌ Overlay")
+            }
+
+            // 3. Set as default assistant
+            val componentName = "$packageName/com.aria.assistant.AssistantActivity"
+            val assistantResult = execRoot("cmd role add-role-holder android.app.role.ASSISTANT $packageName")
+            if (!assistantResult.contains("Error")) {
+                successCount++
+                results.add("✅ Assistant")
+            } else {
+                // Fallback: settings put secure assistant
+                val fallback = execRoot("settings put secure assistant $componentName")
+                if (!fallback.contains("Error")) {
+                    successCount++
+                    results.add("✅ Assistant (fallback)")
+                } else {
+                    failCount++
+                    results.add("❌ Assistant")
+                }
+            }
+
+            // 4. Enable Accessibility Service via root
+            val a11yResult = execRoot("settings put secure enabled_accessibility_services $packageName/com.aria.assistant.ARIAAccessibilityService && settings put secure accessibility_enabled 1")
+            if (!a11yResult.contains("Error")) {
+                successCount++
+                results.add("✅ Accessibility")
+            } else {
+                failCount++
+                results.add("❌ Accessibility")
+            }
+
+            // 5. Enable Notification Listener via root
+            val notifResult = execRoot("cmd notification allow_listener $packageName/com.aria.assistant.AriaNotificationListenerService")
+            if (!notifResult.contains("Error")) {
+                successCount++
+                results.add("✅ Notification Listener")
+            } else {
+                failCount++
+                results.add("❌ Notification Listener")
+            }
+
+            val finalSuccess = successCount
+            val finalFail = failCount
+            val summaryResults = results
+
+            withContext(Dispatchers.Main) {
+                rootAutoEnableButton.isEnabled = true
+                renderSetupState()
+                if (finalFail == 0) {
+                    Toast.makeText(this@MainActivity, "✅ All setup complete! $finalSuccess items enabled.", Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(this@MainActivity, "⚠️ $finalSuccess succeeded, $finalFail failed. Some may need manual setup.", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun execRoot(command: String): String {
+        return try {
+            val process = Runtime.getRuntime().exec(arrayOf("su", "-c", command))
+            val output = process.inputStream.bufferedReader().readText()
+            val error = process.errorStream.bufferedReader().readText()
+            process.waitFor()
+            (output + error).trim()
+        } catch (e: Exception) {
+            "Error: ${e.message}"
+        }
+    }
 }

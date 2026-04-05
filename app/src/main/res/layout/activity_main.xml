@@ -193,6 +193,20 @@
                     android:text="📱 Default Assistant"
                     android:textColor="#E0E6F8"
                     android:textSize="13sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/rootAutoEnableButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="⚡ Auto-Enable All (Root)"
+                    android:textSize="13sp"
+                    android:textColor="#FFFFFF"
+                    android:visibility="gone"
+                    app:cornerRadius="12dp"
+                    app:backgroundTint="#4CAF50"
+                    app:icon="@android:drawable/ic_menu_manage"
+                    app:iconTint="#FFFFFF" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
