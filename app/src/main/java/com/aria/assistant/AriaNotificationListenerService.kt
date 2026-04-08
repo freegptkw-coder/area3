@@ -8,6 +8,7 @@ import com.aria.assistant.multitask.AriaTaskRuntime
 import com.aria.assistant.multitask.AriaTaskTypes
 import com.aria.assistant.multitask.TaskPriority
 import com.aria.assistant.multitask.TaskRequest
+import com.aria.assistant.notifications.NotificationBridgeScaffold
 import com.aria.assistant.ConversationMemory
 import java.util.ArrayDeque
 import java.util.Locale
@@ -49,6 +50,8 @@ class AriaNotificationListenerService : NotificationListenerService(), TextToSpe
         val appLabel = packageName.substringAfterLast('.')
             .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
         val compact = buildCompactSummary(appLabel, title, text)
+
+        NotificationBridgeScaffold.recordNotification(this, packageName, title)
         
         ConversationMemory.addMessage(this, "system", "New incoming notification: $compact")
 

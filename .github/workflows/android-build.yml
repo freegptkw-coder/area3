@@ -2,7 +2,7 @@ name: ARIA v3.0 - Build & Test
 
 on:
   push:
-    branches: [main, master]
+    branches: ["**"]
   pull_request:
   workflow_dispatch:
 
@@ -33,11 +33,11 @@ jobs:
       - run: chmod +x ./gradlew
       - uses: gradle/wrapper-validation-action@v2
 
-      - name: Assemble Debug
+      - name: Lint + Unit Test + Assemble Debug
         id: gradle
         run: |
           set +e
-          ./gradlew --no-daemon --stacktrace assembleDebug 2>&1 | tee /tmp/gradle-output.log
+          ./gradlew --no-daemon --stacktrace lintDebug testDebugUnitTest assembleDebug 2>&1 | tee /tmp/gradle-output.log
           echo "exit_code=$?" >> $GITHUB_OUTPUT
           exit 0
 

@@ -220,6 +220,13 @@ class AssistantActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         // Welcome message
         addAssistantMessage("Hello! I'm ARIA Assistant. How can I help you?")
 
+        if (intent.getBooleanExtra("start_push_to_talk", false)) {
+            Handler(Looper.getMainLooper()).postDelayed({
+                manualMicTriggerUntilMs = System.currentTimeMillis() + 20_000L
+                startVoiceRecognition()
+            }, 350)
+        }
+
         // Health heartbeat
         healthHandler.postDelayed(heartbeatRunnable, 60_000)
     }

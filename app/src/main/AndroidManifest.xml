@@ -124,6 +124,31 @@
             android:parentActivityName=".live.LiveTaskManagerActivity" />
 
         <activity
+            android:name=".OnboardingDashboardActivity"
+            android:exported="false"
+            android:parentActivityName=".SettingsActivity" />
+
+        <activity
+            android:name=".WorkspaceManagerActivity"
+            android:exported="false"
+            android:parentActivityName=".OnboardingDashboardActivity" />
+
+        <activity
+            android:name=".TerminalActivity"
+            android:exported="false"
+            android:parentActivityName=".WorkspaceManagerActivity" />
+
+        <activity
+            android:name=".EnvironmentDiagnosticsActivity"
+            android:exported="false"
+            android:parentActivityName=".OnboardingDashboardActivity" />
+
+        <activity
+            android:name=".IntegrationStatusActivity"
+            android:exported="false"
+            android:parentActivityName=".OnboardingDashboardActivity" />
+
+        <activity
             android:name=".DataPrivacyActivity"
             android:exported="false"
             android:parentActivityName=".SettingsActivity" />

@@ -17,10 +17,12 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.cardview.widget.CardView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
+import com.aria.assistant.integrations.IntegrationCapabilityManager
 import com.aria.assistant.live.LiveTaskManagerActivity
 import com.aria.assistant.setup.SetupChecks
 import com.aria.assistant.theme.ThemeManager
 import com.aria.assistant.theme.ThemePalette
+import com.aria.assistant.workspace.WorkspaceRegistry
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.progressindicator.LinearProgressIndicator
@@ -43,6 +45,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var taskManagerButton: MaterialButton
     private lateinit var settingsButton: MaterialButton
     private lateinit var rootAutoEnableButton: MaterialButton
+    private lateinit var pushToTalkButton: MaterialButton
+    private lateinit var workspaceActionButton: MaterialButton
+    private lateinit var terminalActionButton: MaterialButton
+    private lateinit var diagnosticsActionButton: MaterialButton
+    private lateinit var onboardingOpenButton: MaterialButton
+    private lateinit var onboardingSummaryText: TextView
 
     private lateinit var mascotImage: ImageView
     private lateinit var logoImage: ImageView
@@ -84,6 +92,12 @@ class MainActivity : AppCompatActivity() {
         taskManagerButton = findViewById(R.id.taskManagerButton)
         settingsButton = findViewById(R.id.settingsButton)
         rootAutoEnableButton = findViewById(R.id.rootAutoEnableButton)
+        pushToTalkButton = findViewById(R.id.pushToTalkButton)
+        workspaceActionButton = findViewById(R.id.workspaceActionButton)
+        terminalActionButton = findViewById(R.id.terminalActionButton)
+        diagnosticsActionButton = findViewById(R.id.diagnosticsActionButton)
+        onboardingOpenButton = findViewById(R.id.onboardingOpenButton)
+        onboardingSummaryText = findViewById(R.id.onboardingSummaryText)
 
         themeGallery = findViewById(R.id.themeGallery)
 
@@ -116,6 +130,35 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
 
+        pushToTalkButton.setOnClickListener {
+            viewModel.pauseLogoAnimation()
+            startActivity(
+                Intent(this, AssistantActivity::class.java).apply {
+                    putExtra("start_push_to_talk", true)
+                }
+            )
+        }
+
+        workspaceActionButton.setOnClickListener {
+            viewModel.pauseLogoAnimation()
+            startActivity(Intent(this, WorkspaceManagerActivity::class.java))
+        }
+
+        terminalActionButton.setOnClickListener {
+            viewModel.pauseLogoAnimation()
+            startActivity(Intent(this, TerminalActivity::class.java))
+        }
+
+        diagnosticsActionButton.setOnClickListener {
+            viewModel.pauseLogoAnimation()
+            startActivity(Intent(this, EnvironmentDiagnosticsActivity::class.java))
+        }
+
+        onboardingOpenButton.setOnClickListener {
+            viewModel.pauseLogoAnimation()
+            startActivity(Intent(this, OnboardingDashboardActivity::class.java))
+        }
+
         // Root Auto-Enable button
         rootAutoEnableButton.setOnClickListener {
             viewModel.pauseLogoAnimation()
@@ -130,6 +173,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         applyThemeVisuals()
         renderSetupState()
+        renderOnboardingSnapshot()
         renderBrainPanel()
         renderRecentAlerts()
         viewModel.resumeLogoAnimation()
@@ -184,6 +228,22 @@ class MainActivity : AppCompatActivity() {
     private fun buildStatusLine(label: String, done: Boolean): String {
         val icon = if (done) "✅" else "❌"
         return "$label  $icon  ${if (done) "Completed" else "Pending"}"
+    }
+
+    private fun renderOnboardingSnapshot() {
+        val setup = SetupChecks.evaluate(this)
+        val capabilityCount = IntegrationCapabilityManager.collect(this)
+        val availableCount = capabilityCount.count { it.available }
+        val workspaceCount = WorkspaceRegistry.list(this).size
+
+        onboardingSummaryText.text = buildString {
+            append("Setup ")
+            append(if (setup.allDone) "✅ complete" else "⚠️ needs attention")
+            append(" • Integrations ")
+            append("$availableCount/${capabilityCount.size}")
+            append(" • Workspaces ")
+            append(workspaceCount)
+        }
     }
 
     // ── Brain Panel ─────────────────────────────────────────────────

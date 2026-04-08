@@ -522,6 +522,72 @@
             android:layout_marginBottom="20dp"
             android:text="Open Live Safety Center" />
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🧩 Native Tools"
+            android:textColor="#4FC3F7"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="10dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Workspace default permission mode"
+            android:textColor="#888888"
+            android:textSize="13sp"
+            android:layout_marginBottom="6dp"
+            android:paddingStart="16dp" />
+
+        <Spinner
+            android:id="@+id/workspaceDefaultModeSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:background="#2D2D2D"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/onboardingDashboardButton"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="Open Onboarding Dashboard" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/workspaceManagerButton"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="Open Workspace Manager" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/terminalButton"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="Open Terminal" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/diagnosticsButton"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="Open Diagnostics" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/integrationStatusButton"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            android:text="Open Capability Center" />
+
         <!-- ========== v3.0 New Features Section ========== -->
         <TextView
             android:layout_width="match_parent"
