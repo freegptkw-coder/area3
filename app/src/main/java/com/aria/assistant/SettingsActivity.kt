@@ -23,6 +23,8 @@ import com.aria.assistant.live.ConsentStore
 import com.aria.assistant.live.LiveModeController
 import com.aria.assistant.live.LiveSafetyActivity
 import com.aria.assistant.live.core.VoskModelManager
+import com.aria.assistant.workspace.WorkspacePermissionMode
+import com.aria.assistant.workspace.WorkspaceRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -78,6 +80,12 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var liveVisionSwitch: SwitchMaterial
     private lateinit var rootSafetyCenterButton: MaterialButton
     private lateinit var liveSafetyCenterButton: MaterialButton
+    private lateinit var workspaceDefaultModeSpinner: Spinner
+    private lateinit var onboardingDashboardButton: MaterialButton
+    private lateinit var workspaceManagerButton: MaterialButton
+    private lateinit var terminalButton: MaterialButton
+    private lateinit var diagnosticsButton: MaterialButton
+    private lateinit var integrationStatusButton: MaterialButton
     private lateinit var saveButton: MaterialButton
 
     // v3.0 Feature toggles
@@ -166,6 +174,12 @@ class SettingsActivity : AppCompatActivity() {
         liveVisionSwitch = findViewById(R.id.liveVisionSwitch)
         rootSafetyCenterButton = findViewById(R.id.rootSafetyCenterButton)
         liveSafetyCenterButton = findViewById(R.id.liveSafetyCenterButton)
+        workspaceDefaultModeSpinner = findViewById(R.id.workspaceDefaultModeSpinner)
+        onboardingDashboardButton = findViewById(R.id.onboardingDashboardButton)
+        workspaceManagerButton = findViewById(R.id.workspaceManagerButton)
+        terminalButton = findViewById(R.id.terminalButton)
+        diagnosticsButton = findViewById(R.id.diagnosticsButton)
+        integrationStatusButton = findViewById(R.id.integrationStatusButton)
         saveButton = findViewById(R.id.saveButton)
 
         // v3.0 Feature toggles
@@ -201,6 +215,21 @@ class SettingsActivity : AppCompatActivity() {
         liveSafetyCenterButton.setOnClickListener {
             startActivity(Intent(this, LiveSafetyActivity::class.java))
         }
+        onboardingDashboardButton.setOnClickListener {
+            startActivity(Intent(this, OnboardingDashboardActivity::class.java))
+        }
+        workspaceManagerButton.setOnClickListener {
+            startActivity(Intent(this, WorkspaceManagerActivity::class.java))
+        }
+        terminalButton.setOnClickListener {
+            startActivity(Intent(this, TerminalActivity::class.java))
+        }
+        diagnosticsButton.setOnClickListener {
+            startActivity(Intent(this, EnvironmentDiagnosticsActivity::class.java))
+        }
+        integrationStatusButton.setOnClickListener {
+            startActivity(Intent(this, IntegrationStatusActivity::class.java))
+        }
 
         themeSwitch.setOnCheckedChangeListener { _, isChecked ->
             val mode = if (isChecked) ThemeMode.DARK else ThemeMode.LIGHT
@@ -233,6 +262,17 @@ class SettingsActivity : AppCompatActivity() {
         v3DownloadModelButton.setOnClickListener { handleModelDownload() }
         v3DeleteModelButton.setOnClickListener { handleModelDelete() }
         refreshModelStorageSync() // Update UI based on what's downloaded now
+
+        val modeLabels = WorkspacePermissionMode.values().map { it.label }.toTypedArray()
+        workspaceDefaultModeSpinner.adapter = spinnerAdapter(modeLabels)
+        workspaceDefaultModeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val selected = WorkspacePermissionMode.values()[position]
+                WorkspaceRegistry.setDefaultMode(this@SettingsActivity, selected)
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        }
 
         providerSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
@@ -386,6 +426,8 @@ class SettingsActivity : AppCompatActivity() {
         // v3.1 Model language
         val modelLang = v3Toggles["v3_offline_model_language"] as? String ?: "en"
         MODEL_LANG_VALUES.indexOf(modelLang).takeIf { it >= 0 }?.let { v3ModelLangSpinner.setSelection(it) }
+
+        workspaceDefaultModeSpinner.setSelection(WorkspaceRegistry.getDefaultMode(this).ordinal)
 
         refreshModelStorageSync()
 
